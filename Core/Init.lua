@@ -3,10 +3,14 @@ local addonName, addon = ...
 -- Default values for all settings. Each feature owns its own keys.
 addon.defaults = {
     -- Fun
-    fun_owenWilson_enabled = true,
+    fun_owenWilson_enabled = false,
     fun_owenWilson_channel = "Master",
-    fun_batman_enabled     = true,
-    fun_batman_channel     = "Master",
+    fun_batman_enabled       = false,
+    fun_batman_channel       = "Master",
+    fun_bloodlust_enabled    = false,
+    fun_bloodlust_channel    = "Master",
+    fun_blink_enabled        = false,
+    fun_blink_channel        = "Master",
 
     -- UI > Mouse Ring
     ui_mouseRing_enabled          = false,

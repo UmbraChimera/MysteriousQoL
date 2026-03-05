@@ -12,6 +12,8 @@ Core/Settings.lua
 # Feature modules
 Fun/OwenWilson.lua
 Fun/Batman.lua
+Fun/Bloodlust.lua
+Fun/Blink.lua
 UI/MouseRing.lua
 
 # Main entry point — must load last

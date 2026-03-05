@@ -20,6 +20,8 @@ frame:SetScript("OnEvent", function(self, event, name)
     addon.MI_MouseRing_RegisterSettings(uiCat)
     addon.MI_OwenWilson_RegisterSettings(funCat)
     addon.MI_Batman_RegisterSettings(funCat)
+    addon.MI_Bloodlust_RegisterSettings(funCat)
+    addon.MI_Blink_RegisterSettings(funCat)
 
     Settings.RegisterAddOnCategory(rootCat)
     addon.settingsRootCatID = rootCat:GetID()
