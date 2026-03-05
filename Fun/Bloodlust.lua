@@ -1,18 +1,20 @@
 local addonName, addon = ...
 
 -- Plays r2d2.mp3 when a Bloodlust-type haste effect is applied to the player.
--- Add spell IDs to MI_LUST_IDS to extend coverage.
+-- Detects via the Sated-family debuffs; the buff itself became a private aura in 11.1.
+-- Add debuff spell IDs to MI_LUST_IDS to extend coverage.
 
 local SOUND = "Interface\\AddOns\\MysteriousQoL\\Sounds\\Lust\\r2d2.mp3"
 
--- Add any Bloodlust-equivalent spell ID here.
+-- Sated-type debuffs applied alongside each Bloodlust equivalent.
+-- These remain publicly readable via C_UnitAuras despite the private aura changes.
 local MI_LUST_IDS = {
-    [2825]   = true,  -- Bloodlust         (Shaman)
-    [32182]  = true,  -- Heroism           (Shaman)
-    [80353]  = true,  -- Time Warp         (Mage)
-    [90355]  = true,  -- Ancient Hysteria  (Hunter exotic pet)
-    [264667] = true,  -- Primal Rage       (Ferocity pet)
-    [390386] = true,  -- Fury of the Aspects (Evoker)
+    [57724]  = true,  -- Sated                 (Bloodlust)
+    [264689] = true,  -- Fatigued              (Primal Rage)
+    [57723]  = true,  -- Exhaustion            (Heroism)
+    [80354]  = true,  -- Temporal Displacement (Time Warp)
+    [95809]  = true,  -- Insanity              (Ancient Hysteria)
+    [390435] = true,  -- Overpowered           (Fury of the Aspects)
 }
 
 local played = false
