@@ -1,0 +1,18 @@
+## Interface: 110207, 120000, 120001
+## Title: MysteriousQoL
+## Notes: Personal quality of life improvements
+## Version: 1.0.0
+## SavedVariables: MysteriousQoLDB
+## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
+
+# Core — must load first
+Core/Init.lua
+Core/Settings.lua
+
+# Feature modules
+Fun/OwenWilson.lua
+Fun/Batman.lua
+UI/MouseRing.lua
+
+# Main entry point — must load last
+MysteriousQoL.lua
