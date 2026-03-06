@@ -12,33 +12,33 @@ frame:SetScript("OnEvent", function(self, event, name)
 
     -- Build the native Settings panel.
     -- Each subcategory maps to a feature group (Fun, UI, Combat, …).
-    local rootCat    = Settings.RegisterVerticalLayoutCategory(addonName)
-    local generalCat = Settings.RegisterVerticalLayoutSubcategory(rootCat, "General")
-    local uiCat      = Settings.RegisterVerticalLayoutSubcategory(rootCat, "UI")
-    local funCat     = Settings.RegisterVerticalLayoutSubcategory(rootCat, "Fun")
+    local rootCat,    rootLayout    = Settings.RegisterVerticalLayoutCategory(addonName)
+    local generalCat, generalLayout = Settings.RegisterVerticalLayoutSubcategory(rootCat, "General")
+    local uiCat,      uiLayout      = Settings.RegisterVerticalLayoutSubcategory(rootCat, "UI")
+    local funCat,     funLayout     = Settings.RegisterVerticalLayoutSubcategory(rootCat, "Fun")
 
     -- Register per-feature settings into their category.
-    -- Section headers via the native Settings API.
-    local function Header(cat, title)
-        Settings.RegisterInitializer(cat, CreateSettingsListSectionHeaderInitializer(title))
+    -- Section headers use the layout object returned alongside the category.
+    local function Header(layout, title)
+        layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(title))
     end
 
     addon.MI_Vendor_RegisterSettings(generalCat)
     addon.MI_MouseRing_RegisterSettings(uiCat)
 
-    Header(funCat, "Owen Wilson")
+    Header(funLayout, "Owen Wilson")
     addon.MI_OwenWilson_RegisterSettings(funCat)
-    Header(funCat, "Batman")
+    Header(funLayout, "Batman")
     addon.MI_Batman_RegisterSettings(funCat)
-    Header(funCat, "Bloodlust")
+    Header(funLayout, "Bloodlust")
     addon.MI_Bloodlust_RegisterSettings(funCat)
-    Header(funCat, "Blink")
+    Header(funLayout, "Blink")
     addon.MI_Blink_RegisterSettings(funCat)
-    Header(funCat, "Stealth")
+    Header(funLayout, "Stealth")
     addon.MI_Sneaky_RegisterSettings(funCat)
-    Header(funCat, "Roll")
+    Header(funLayout, "Roll")
     addon.MI_Rolling_RegisterSettings(funCat)
-    Header(funCat, "Zoomies")
+    Header(funLayout, "Zoomies")
     addon.MI_Zoomies_RegisterSettings(funCat)
 
     Settings.RegisterAddOnCategory(rootCat)
