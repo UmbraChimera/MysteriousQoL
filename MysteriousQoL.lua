@@ -12,16 +12,19 @@ frame:SetScript("OnEvent", function(self, event, name)
 
     -- Build the native Settings panel.
     -- Each subcategory maps to a feature group (Fun, UI, Combat, …).
-    local rootCat = Settings.RegisterVerticalLayoutCategory(addonName)
-    local uiCat   = Settings.RegisterVerticalLayoutSubcategory(rootCat, "UI")
-    local funCat  = Settings.RegisterVerticalLayoutSubcategory(rootCat, "Fun")
+    local rootCat    = Settings.RegisterVerticalLayoutCategory(addonName)
+    local generalCat = Settings.RegisterVerticalLayoutSubcategory(rootCat, "General")
+    local uiCat      = Settings.RegisterVerticalLayoutSubcategory(rootCat, "UI")
+    local funCat     = Settings.RegisterVerticalLayoutSubcategory(rootCat, "Fun")
 
     -- Register per-feature settings into their category.
+    addon.MI_Vendor_RegisterSettings(generalCat)
     addon.MI_MouseRing_RegisterSettings(uiCat)
     addon.MI_OwenWilson_RegisterSettings(funCat)
     addon.MI_Batman_RegisterSettings(funCat)
     addon.MI_Bloodlust_RegisterSettings(funCat)
     addon.MI_Blink_RegisterSettings(funCat)
+    addon.MI_Sneaky_RegisterSettings(funCat)
 
     Settings.RegisterAddOnCategory(rootCat)
     addon.settingsRootCatID = rootCat:GetID()

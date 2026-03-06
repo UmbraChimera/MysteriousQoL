@@ -5,6 +5,18 @@ local addonName, addon = ...
 -- onChange : optional function(value) called after the value is written to addon.db.
 addon.settings = {}
 
+-- Shared options builder for the WoW audio channel dropdown.
+-- Returns a container usable directly as the optionsFn for addon.settings.Dropdown.
+function addon.settings.GetChannelOptions()
+    local container = Settings.CreateControlTextContainer()
+    container:Add("Master",   "Master")
+    container:Add("SFX",      "Sound Effects")
+    container:Add("Music",    "Music")
+    container:Add("Ambience", "Ambience")
+    container:Add("Dialog",   "Dialog")
+    return container:GetData()
+end
+
 -- Creates a boolean checkbox in the given category.
 -- key    : key in addon.db / addon.defaults
 -- name   : display label shown in the panel

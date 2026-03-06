@@ -10,10 +10,12 @@ Core/Init.lua
 Core/Settings.lua
 
 # Feature modules
+General/Vendor.lua
 Fun/OwenWilson.lua
 Fun/Batman.lua
 Fun/Bloodlust.lua
 Fun/Blink.lua
+Fun/Sneaky.lua
 UI/MouseRing.lua
 
 # Main entry point — must load last

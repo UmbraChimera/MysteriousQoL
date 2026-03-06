@@ -8,9 +8,17 @@ addon.defaults = {
     fun_batman_enabled       = false,
     fun_batman_channel       = "Master",
     fun_bloodlust_enabled    = false,
+    fun_bloodlust_sound      = "r2d2.ogg",
     fun_bloodlust_channel    = "Master",
     fun_blink_enabled        = false,
     fun_blink_channel        = "Master",
+    fun_sneaky_enabled       = false,
+    fun_sneaky_channel       = "Master",
+
+    -- General
+    vendor_autoRepair            = false,
+    vendor_autoRepair_guildBank  = false,
+    vendor_autoSell              = false,
 
     -- UI > Mouse Ring
     ui_mouseRing_enabled          = false,
