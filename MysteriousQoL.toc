@@ -16,6 +16,8 @@ Fun/Batman.lua
 Fun/Bloodlust.lua
 Fun/Blink.lua
 Fun/Sneaky.lua
+Fun/Rolling.lua
+Fun/Zoomies.lua
 UI/MouseRing.lua
 
 # Main entry point — must load last

@@ -1,4 +1,4 @@
-**MysteriousQoL** is a small personal quality-of-life addon with seven independently toggleable features. Each one can be turned on or off in the addon's settings panel (Game Menu -> Interface -> AddOns -> MysteriousQoL).
+**MysteriousQoL** is a small personal quality-of-life addon with independently toggleable features. Each one can be turned on or off in the addon's settings panel (`/mqol` or Game Menu → Interface → AddOns → MysteriousQoL).
 
 ***
 
@@ -17,27 +17,32 @@
 
 *   **Auto Repair** - automatically repairs all equipped items as soon as the merchant window opens, and prints the cost to chat (e.g., `Repaired for 12g 34s`)
 *   **Use Guild Bank for Repairs** - optionally draws repair costs from your guild bank when available
-*   **Auto Sell Greys** - automatically sells all grey (Poor quality) items from your bags the moment you open a vendor, keeping your bags clean without any extra clicks
+*   **Auto Sell Greys** - automatically sells all grey (Poor quality) items from your bags the moment you open a vendor
 
 ***
 
-**Combat Reminders** Center-screen notices so you never forget the basics before a pull:
-
-*   **Class Buff Reminder** - shows a pulsing icon of your class buff when it is missing from you or any group/raid member. Covers Druid (Mark of the Wild), Mage (Arcane Intellect), Priest (Power Word: Fortitude), Warrior (Battle Shout), Evoker (Blessing of the Bronze), and Shaman (Skyfury). Automatically suppressed while mounted, on a taxi, in a vehicle, or dead
-*   **No Pet Reminder** - shows a large red bouncing "No Pet" message on screen for Warlocks and Beast Mastery/Survival Hunters when no active pet is present. Automatically suppressed while dead or mounted
+**Fun - Owen Wilson Loot Sounds** Every time a loot window opens, the addon plays one of 11 randomly selected Owen Wilson "wow" audio clips. Audio channel is configurable.
 
 ***
 
-**Fun - Owen Wilson Loot Sounds** Every time a loot window opens, the addon plays one of 11 randomly selected Owen Wilson "wow" audio clips. The audio channel (Master, SFX, Music, Ambience, or Dialog) is configurable so it blends in with your existing volume settings however you like.
+**Fun - Batman Teleport Sound** Plays the classic Batman theme whenever you zone into a new area via hearthstone, mage portal, or toy. Does not fire on death/resurrection, zone-boundary crossings while flying or walking, initial login, or UI reloads. Audio channel is configurable.
 
 ***
 
-**Fun - Batman Teleport Sound** Plays the classic Batman theme whenever you zone into a new area via hearthstone, mage portal, or a toy. Smart filtering ensures it does not play on death/resurrection, simple zone-boundary crossings while flying or walking, initial login, or UI reloads - only real teleports trigger it. Audio channel is configurable.
-
-***
-
-**Fun - Bloodlust Sound** Plays an R2-D2 sound when Bloodlust, Heroism, Time Warp, Ancient Hysteria, Primal Rage, or Fury of the Aspects is applied to you. Fires once per cast, not on every aura update. Audio channel is configurable.
+**Fun - Bloodlust Sound** Plays a sound when Bloodlust, Heroism, Time Warp, Ancient Hysteria, Primal Rage, or Fury of the Aspects is applied to you. Detected via the Sated-family debuffs. Sound choice and audio channel are configurable.
 
 ***
 
 **Fun - Blink Sound** Plays a DBZ sound when you use Blink or Shimmer (Mage) or Shift (Demon Hunter). Audio channel is configurable.
+
+***
+
+**Fun - Stealth Sound** Plays a sound when you use Stealth (Rogue) or Prowl (Druid). Audio channel is configurable.
+
+***
+
+**Fun - Roll Sound** Plays a randomly selected sound when you use Roll or Chi Torpedo (Monk). Audio channel is configurable.
+
+***
+
+**Fun - Zoomies Sound** Plays a sound when you use a major speed ability: Aspect of the Cheetah (Hunter), Dash (Druid), or Divine Steed (Paladin). Sound choice and audio channel are configurable.

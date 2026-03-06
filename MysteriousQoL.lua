@@ -25,6 +25,8 @@ frame:SetScript("OnEvent", function(self, event, name)
     addon.MI_Bloodlust_RegisterSettings(funCat)
     addon.MI_Blink_RegisterSettings(funCat)
     addon.MI_Sneaky_RegisterSettings(funCat)
+    addon.MI_Rolling_RegisterSettings(funCat)
+    addon.MI_Zoomies_RegisterSettings(funCat)
 
     Settings.RegisterAddOnCategory(rootCat)
     addon.settingsRootCatID = rootCat:GetID()
