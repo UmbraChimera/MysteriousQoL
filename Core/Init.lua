@@ -17,7 +17,6 @@ addon.defaults = {
     fun_rolling_enabled      = false,
     fun_rolling_channel      = "Master",
     fun_zoomies_enabled      = false,
-    fun_zoomies_sound        = "benny_hill.ogg",
     fun_zoomies_channel      = "Master",
 
     -- General

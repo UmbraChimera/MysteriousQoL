@@ -1,10 +1,10 @@
 local _, addon = ...
 
 -- Plays a sound when the player uses a major speed ability.
--- Structured like Bloodlust: single SOUND_DIR + dropdown for future sound choices.
+-- When multiple sounds are available, convert SOUND to SOUND_DIR + dropdown (see Bloodlust.lua).
 -- Add spell IDs to MI_ZOOM_IDS to extend coverage.
 
-local SOUND_DIR = "Interface\\AddOns\\MysteriousQoL\\Sounds\\Zoomies\\"
+local SOUND = "Interface\\AddOns\\MysteriousQoL\\Sounds\\Zoomies\\benny_hill.ogg"
 
 local PlaySoundFile = PlaySoundFile
 
@@ -19,29 +19,16 @@ local f = CreateFrame("Frame")
 f:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 f:SetScript("OnEvent", function(_, _, _, _, spellID)
     if addon.db.fun_zoomies_enabled and MI_ZOOM_IDS[spellID] then
-        PlaySoundFile(SOUND_DIR .. addon.db.fun_zoomies_sound, addon.db.fun_zoomies_channel)
+        PlaySoundFile(SOUND, addon.db.fun_zoomies_channel)
     end
 end)
 
 function addon.MI_Zoomies_RegisterSettings(funCat)
-    local function GetSoundOptions()
-        local container = Settings.CreateControlTextContainer()
-        container:Add("benny_hill.ogg", "Benny Hill")
-        return container:GetData()
-    end
-
     addon.settings.Checkbox(
         funCat,
         "fun_zoomies_enabled",
         "Zoomies Sound",
         "Plays a sound when you use Aspect of the Cheetah, Dash, Divine Steed, or any equivalent speed ability."
-    )
-    addon.settings.Dropdown(
-        funCat,
-        "fun_zoomies_sound",
-        "Zoomies Sound Choice",
-        GetSoundOptions,
-        "Which sound to play when you zoom."
     )
     addon.settings.Dropdown(
         funCat,

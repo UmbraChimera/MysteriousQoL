@@ -18,14 +18,27 @@ frame:SetScript("OnEvent", function(self, event, name)
     local funCat     = Settings.RegisterVerticalLayoutSubcategory(rootCat, "Fun")
 
     -- Register per-feature settings into their category.
+    -- Section headers via the native Settings API.
+    local function Header(cat, title)
+        Settings.RegisterInitializer(cat, CreateSettingsListSectionHeaderInitializer(title))
+    end
+
     addon.MI_Vendor_RegisterSettings(generalCat)
     addon.MI_MouseRing_RegisterSettings(uiCat)
+
+    Header(funCat, "Owen Wilson")
     addon.MI_OwenWilson_RegisterSettings(funCat)
+    Header(funCat, "Batman")
     addon.MI_Batman_RegisterSettings(funCat)
+    Header(funCat, "Bloodlust")
     addon.MI_Bloodlust_RegisterSettings(funCat)
+    Header(funCat, "Blink")
     addon.MI_Blink_RegisterSettings(funCat)
+    Header(funCat, "Stealth")
     addon.MI_Sneaky_RegisterSettings(funCat)
+    Header(funCat, "Roll")
     addon.MI_Rolling_RegisterSettings(funCat)
+    Header(funCat, "Zoomies")
     addon.MI_Zoomies_RegisterSettings(funCat)
 
     Settings.RegisterAddOnCategory(rootCat)
