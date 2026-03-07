@@ -11,11 +11,12 @@ frame:SetScript("OnEvent", function(self, event, name)
     addon:MI_InitDB()
 
     -- Build the native Settings panel.
-    -- Each subcategory maps to a feature group (Fun, UI, Combat, …).
-    local rootCat,    rootLayout    = Settings.RegisterVerticalLayoutCategory(addonName)
-    local generalCat, generalLayout = Settings.RegisterVerticalLayoutSubcategory(rootCat, "General")
-    local uiCat,      uiLayout      = Settings.RegisterVerticalLayoutSubcategory(rootCat, "UI")
-    local funCat,     funLayout     = Settings.RegisterVerticalLayoutSubcategory(rootCat, "Fun")
+    -- Each subcategory maps to a feature group (General, UI, Reminders, Fun).
+    local rootCat,      rootLayout      = Settings.RegisterVerticalLayoutCategory(addonName)
+    local generalCat,   generalLayout   = Settings.RegisterVerticalLayoutSubcategory(rootCat, "General")
+    local uiCat,        uiLayout        = Settings.RegisterVerticalLayoutSubcategory(rootCat, "UI")
+    local remindersCat, remindersLayout = Settings.RegisterVerticalLayoutSubcategory(rootCat, "Reminders")
+    local funCat,       funLayout       = Settings.RegisterVerticalLayoutSubcategory(rootCat, "Fun")
 
     -- Register per-feature settings into their category.
     -- Section headers use the layout object returned alongside the category.
@@ -25,6 +26,7 @@ frame:SetScript("OnEvent", function(self, event, name)
 
     addon.MI_Vendor_RegisterSettings(generalCat)
     addon.MI_MouseRing_RegisterSettings(uiCat)
+    addon.MI_Reminders_RegisterSettings(remindersCat, remindersLayout)
 
     Header(funLayout, "Owen Wilson")
     addon.MI_OwenWilson_RegisterSettings(funCat)
@@ -46,6 +48,7 @@ frame:SetScript("OnEvent", function(self, event, name)
 
     -- Initialize features that need to be active on load.
     addon.MI_MouseRing_Init()
+    addon.MI_Reminders_Init()
 end)
 
 -- ── Slash command ────────────────────────────────────────────────────────────

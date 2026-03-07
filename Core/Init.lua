@@ -19,6 +19,11 @@ addon.defaults = {
     fun_zoomies_enabled      = false,
     fun_zoomies_channel      = "Master",
 
+    -- Combat
+    combat_buffReminder_enabled      = false,
+    combat_petReminder_enabled       = false,
+    combat_petIdleReminder_enabled   = false,
+
     -- General
     vendor_autoRepair            = false,
     vendor_autoRepair_guildBank  = false,

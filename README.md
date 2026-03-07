@@ -17,7 +17,15 @@
 
 *   **Auto Repair** - automatically repairs all equipped items as soon as the merchant window opens, and prints the cost to chat (e.g., `Repaired for 12g 34s`)
 *   **Use Guild Bank for Repairs** - optionally draws repair costs from your guild bank when available
-*   **Auto Sell Greys** - automatically sells all grey (Poor quality) items from your bags the moment you open a vendor
+*   **Auto Sell Greys** - automatically sells all grey (Poor quality) items from your bags the moment you open a vendor, and prints the total value earned to chat
+
+***
+
+**Combat Reminders** Center-screen visual indicators for things you should not forget in the heat of the moment:
+
+*   **Class Buff Reminder** - shows a pulsing icon when your class buff (Mark of the Wild, Arcane Intellect, Power Word: Fortitude, Battle Shout, Blessing of the Bronze, or Skyfury) is missing from you or any group member. Suppressed while dead, mounted, in a vehicle, or on a taxi
+*   **No Pet Reminder** - shows a bouncing center-screen warning when you have no active pet, for Warlocks and Beast Mastery / Survival Hunters
+*   **Pet Idle Reminder** - shows a bouncing center-screen warning when your pet is alive but not attacking while you are in combat
 
 ***
 
@@ -45,4 +53,4 @@
 
 ***
 
-**Fun - Zoomies Sound** Plays a sound when you use a major speed ability: Aspect of the Cheetah (Hunter), Dash (Druid), or Divine Steed (Paladin). Sound choice and audio channel are configurable.
+**Fun - Zoomies Sound** Plays a sound when you use a major speed ability: Aspect of the Cheetah (Hunter), Dash (Druid), or Divine Steed (Paladin). Audio channel is configurable.
