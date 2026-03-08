@@ -127,7 +127,6 @@ local runner = CreateFrame("Frame", nil, UIParent)
 runner:Hide()
 runner:SetScript("OnUpdate", function()
     local db = addon.db
-    if not db then return end
 
     -- Lazy creation
     if not ringFrame then ringFrame = createRingFrame() end
@@ -214,7 +213,7 @@ local evtFrame = CreateFrame("Frame")
 evtFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 evtFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 evtFrame:SetScript("OnEvent", function()
-    if addon.db and addon.db.ui_mouseRing_enabled and addon.db.ui_mouseRing_onlyInCombat then
+    if addon.db.ui_mouseRing_enabled and addon.db.ui_mouseRing_onlyInCombat then
         if not runner:IsShown() then runner:Show() end
     end
 end)

@@ -42,6 +42,8 @@ frame:SetScript("OnEvent", function(self, event, name)
     addon.MI_Rolling_RegisterSettings(funCat)
     Header(funLayout, "Zoomies")
     addon.MI_Zoomies_RegisterSettings(funCat)
+    Header(funLayout, "Shame")
+    addon.MI_Shame_RegisterSettings(funCat)
 
     Settings.RegisterAddOnCategory(rootCat)
     addon.settingsRootCatID = rootCat:GetID()

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.9
+- Added **Don't Release Reminder** - shows a large bouncing "Don't release you dolt!" message when you die in a raid instance while in a raid group.
+- Added **Shame Sound** - plays a sound when you release spirit in a raid instance. Does not fire for healer rezzes.
+
 ## 1.0.8
 - Added **Combat Reminders** - center-screen visual indicators for things you shouldn't forget:
   - **Class Buff Reminder** - pulsing icon when your class buff (Mark of the Wild, Arcane Intellect, Power Word: Fortitude, Battle Shout, Blessing of the Bronze, or Skyfury) is missing from you or any group member. Suppressed while dead, mounted, in a vehicle, or on a taxi.

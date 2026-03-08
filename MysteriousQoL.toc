@@ -1,7 +1,7 @@
 ## Interface: 120001
 ## Title: MysteriousQoL
 ## Notes: Mysterious quality of life improvements
-## Version: 1.0.8
+## Version: 1.0.9
 ## SavedVariables: MysteriousQoLDB
 ## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
 
@@ -18,7 +18,11 @@ Fun/Blink.lua
 Fun/Sneaky.lua
 Fun/Rolling.lua
 Fun/Zoomies.lua
+Fun/Shame.lua
 UI/MouseRing.lua
+Reminders/BuffReminder.lua
+Reminders/PetReminder.lua
+Reminders/DeathReminder.lua
 Reminders/Reminders.lua
 
 # Main entry point — must load last

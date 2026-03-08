@@ -14,8 +14,8 @@ local SOUND_NAMES = {
     "wowk.ogg",
 }
 local SOUNDS = {}
-for _, name in ipairs(SOUND_NAMES) do
-    SOUNDS[#SOUNDS + 1] = SOUND_DIR .. name
+for i, name in ipairs(SOUND_NAMES) do
+    SOUNDS[i] = SOUND_DIR .. name
 end
 
 local lootFrame = CreateFrame("Frame")

@@ -18,11 +18,14 @@ addon.defaults = {
     fun_rolling_channel      = "Master",
     fun_zoomies_enabled      = false,
     fun_zoomies_channel      = "Master",
+    fun_shame_enabled        = false,
+    fun_shame_channel        = "Master",
 
     -- Combat
     combat_buffReminder_enabled      = false,
     combat_petReminder_enabled       = false,
     combat_petIdleReminder_enabled   = false,
+    combat_deathReminder_enabled     = false,
 
     -- General
     vendor_autoRepair            = false,
