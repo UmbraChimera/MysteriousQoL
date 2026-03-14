@@ -88,6 +88,16 @@ addon.defaults = {
     -- UI > Minimap Button
     ui_minimapButton_enabled      = true,
     ui_minimapButton_angle        = 220,
+
+    -- Guild
+    guild_alts_enabled          = true,
+    guild_chat_showMain         = true,
+    guild_log_enabled           = true,
+    guild_log_maxEntries        = 200,
+    guild_sync_enabled          = true,
+    guild_writeOfficerNotes     = true,
+    guild_panel_scale           = 1.0,
+    settings_panel_scale        = 1.0,
 }
 
 -- Initialize the SavedVariables-backed DB, filling in any missing keys with defaults.

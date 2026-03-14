@@ -1,4 +1,4 @@
-local addonName, addon = ...
+﻿local addonName, addon = ...
 
 local UI = addon.customUI
 local channelOpts = {
@@ -274,6 +274,36 @@ frame:SetScript("OnEvent", function(self, event, name)
             })
     end)
 
+    -- ─── GUILD ─────────────────────────────────────────────────────────────
+
+    UI.RegisterCategory("Guild", function()
+        UI.Header("Alt Tracking")
+        UI.Checkbox("guild_alts_enabled", "Enable Guild Module",
+            "Enables alt/main linking, chat labels, sync, and activity log.")
+        UI.Checkbox("guild_chat_showMain", "Show Main in Chat",
+            "When a linked alt speaks in chat, their name appears as [AltName (MainName)] in chat.")
+
+        UI.Header("Sync")
+        UI.Checkbox("guild_sync_enabled", "Sync Alt Data With Guildmates",
+            "Broadcasts your alt group data to guild members who also have MysteriousQoL installed. Auto-syncs 30 seconds after login. Trusted rank is set via ^#MQoL:N#^ in Guild Info (default: rank 1 and above).")
+        UI.Checkbox("guild_writeOfficerNotes", "Write Main Tag to Officer Notes",
+            "When you add an alt to a group, writes [M:MainName] to their officer note. Requires officer rank. Never overwrites unrelated notes.")
+
+        UI.Header("Log")
+        UI.Checkbox("guild_log_enabled", "Activity Log",
+            "Records guild joins, leaves, and rank changes.",
+            nil,
+            {
+                { type = "slider", key = "guild_log_maxEntries", label = "Max Log Entries",
+                  min = 50, max = 500, step = 50 },
+            })
+
+        UI.Header("Management")
+        UI.Button("Open Guild Manager", function()
+            if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end
+        end)
+    end)
+
     -- Build sidebar tabs now that categories are registered
     addon.MI_SettingsUI_BuildTabs()
 
@@ -284,6 +314,7 @@ frame:SetScript("OnEvent", function(self, event, name)
     addon.MI_MouseRing_Init()
     addon.MI_Dragonriding_Init()
     addon.MI_Reminders_Init()
+    addon.MI_Guild_Init()
 
     -- Apply CVars
     if addon.db.general_maxCameraDistance then
@@ -294,7 +325,11 @@ end)
 -- ── Slash command ────────────────────────────────────────────────────────────
 
 SLASH_MYSTERIOUSQOL1 = "/mqol"
-SlashCmdList["MYSTERIOUSQOL"] = function()
+SlashCmdList["MYSTERIOUSQOL"] = function(msg)
+    if msg and msg:lower() == "guild" then
+        if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end
+        return
+    end
     if addon.customUI and addon.customUI.Toggle then
         addon.customUI.Toggle()
     end

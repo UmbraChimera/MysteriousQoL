@@ -127,6 +127,39 @@ function addon.customUI.Header(title)
     table.insert(allWidgets, { frame = frame, height = 24 })
 end
 
+-- ── Widget: Button ─────────────────────────────────────────────────────────
+
+function addon.customUI.Button(label, onClick)
+    local frame = CreateFrame("Frame", nil, scrollChild)
+    frame:SetHeight(WIDGET_HEIGHT)
+
+    local btn = CreateFrame("Button", nil, frame, "BackdropTemplate")
+    btn:SetSize(160, 22)
+    btn:SetPoint("LEFT", PADDING_LEFT, 0)
+    btn:SetBackdrop({
+        bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    })
+    btn:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+    btn:SetBackdropBorderColor(unpack(C.tealBorder))
+    btn:SetScript("OnEnter", function(self)
+        self:SetBackdropBorderColor(0, 0.8, 0.8, 1)
+    end)
+    btn:SetScript("OnLeave", function(self)
+        self:SetBackdropBorderColor(unpack(C.tealBorder))
+    end)
+    btn:SetScript("OnClick", onClick)
+
+    local lbl = btn:CreateFontString(nil, "OVERLAY")
+    lbl:SetFont(FONT, 11, "")
+    lbl:SetAllPoints()
+    lbl:SetJustifyH("CENTER")
+    lbl:SetTextColor(unpack(C.teal))
+    lbl:SetText(label)
+
+    table.insert(allWidgets, { frame = frame, height = WIDGET_HEIGHT })
+end
+
 -- ── Widget: Checkbox ───────────────────────────────────────────────────────
 
 function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
@@ -542,6 +575,7 @@ local function BuildMainFrame()
     mainFrame:SetScript("OnDragStart", mainFrame.StartMoving)
     mainFrame:SetScript("OnDragStop", mainFrame.StopMovingOrSizing)
     MakeBackdrop(mainFrame, C.bgMain, C.tealBorder)
+    mainFrame:SetScale(addon.db.settings_panel_scale or 1.0)
     mainFrame:Hide()
 
     -- ESC to close
@@ -569,6 +603,7 @@ local function BuildMainFrame()
 
     local close = CreateFrame("Button", nil, mainFrame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)
+    close:SetFrameLevel(mainFrame:GetFrameLevel() + 1)
     close:SetScript("OnClick", function() mainFrame:Hide() end)
 
     -- ── Tab bar ──────────────────────────────────────────────────────────
@@ -610,7 +645,7 @@ local function BuildMainFrame()
     local scrollTrack = CreateFrame("Frame", nil, contentFrame)
     scrollTrack:SetWidth(SCROLLBAR_WIDTH)
     scrollTrack:SetPoint("TOPRIGHT", -2, -2)
-    scrollTrack:SetPoint("BOTTOMRIGHT", -2, 2)
+    scrollTrack:SetPoint("BOTTOMRIGHT", -2, 18)
 
     local scrollTrackBg = scrollTrack:CreateTexture(nil, "BACKGROUND")
     scrollTrackBg:SetAllPoints()
@@ -695,6 +730,47 @@ local function BuildMainFrame()
     addon._updateScrollbar = UpdateScrollbar
 
     addon._settingsFrame = mainFrame
+
+    -- Resize grip (bottom-right corner)
+    local grip = CreateFrame("Frame", nil, mainFrame)
+    grip:SetSize(14, 14)
+    grip:SetPoint("BOTTOMRIGHT", -2, 2)
+    grip:EnableMouse(true)
+    local function MakeDot(x, y)
+        local t = grip:CreateTexture(nil, "OVERLAY")
+        t:SetSize(3, 3); t:SetPoint("BOTTOMRIGHT", x, y)
+        t:SetColorTexture(0.00, 0.55, 0.55, 0.5)
+    end
+    MakeDot(-1, 1); MakeDot(-5, 1); MakeDot(-1, 5)
+    MakeDot(-9, 1); MakeDot(-5, 5); MakeDot(-1, 9)
+    grip:SetScript("OnEnter", function()
+        for _, tex in ipairs({grip:GetRegions()}) do tex:SetAlpha(1) end
+    end)
+    grip:SetScript("OnLeave", function()
+        for _, tex in ipairs({grip:GetRegions()}) do tex:SetAlpha(0.5) end
+    end)
+    local gripDragging, gripStartX, gripStartScale = false, 0, 1.0
+    grip:SetScript("OnMouseDown", function(_, btn)
+        if btn ~= "LeftButton" then return end
+        gripDragging = true
+        gripStartX = select(1, GetCursorPosition())
+        gripStartScale = mainFrame:GetScale()
+    end)
+    grip:SetScript("OnMouseUp", function()
+        if gripDragging then
+            local snapped = math.floor(mainFrame:GetScale() / 0.05 + 0.5) * 0.05
+            snapped = math.max(0.6, math.min(2.0, snapped))
+            addon.db.settings_panel_scale = snapped
+            mainFrame:SetScale(snapped)
+        end
+        gripDragging = false
+    end)
+    grip:SetScript("OnUpdate", function()
+        if not gripDragging then return end
+        local cx = select(1, GetCursorPosition())
+        local newScale = math.max(0.6, math.min(2.0, gripStartScale + (cx - gripStartX) / 500))
+        mainFrame:SetScale(newScale)
+    end)
 end
 
 -- ── Init ─────────────────────────────────────────────────────────────────
@@ -705,7 +781,7 @@ end
 
 -- Called after all categories are registered (from MysteriousQoL.lua)
 function addon.MI_SettingsUI_BuildTabs()
-    local order = { "General", "UI", "Reminders", "Fun" }
+    local order = { "General", "UI", "Reminders", "Fun", "Guild" }
     -- Count valid tabs
     local validTabs = {}
     for _, name in ipairs(order) do
