@@ -1,0 +1,42 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+
+    <!--
+        A settings row with a coloured swatch button + label.
+        Does NOT inherit SettingsListElementTemplate -that template has overlays
+        that intercept mouse events and prevent the button from being clickable.
+        The settings list only requires Init/EvaluateState/Release/GetElementData
+        on the mixin, which MysteriousQoL_ColorSwatchMixin provides.
+        The matching Lua mixin lives in UI/MouseRing.lua.
+    -->
+    <Frame name="MysteriousQoL_ColorSwatchTemplate" virtual="true"
+           mixin="MysteriousQoL_ColorSwatchMixin">
+        <Size y="26"/>
+        <Frames>
+            <!-- Clickable colour swatch -->
+            <Button parentKey="ColorBtn">
+                <Size x="20" y="20"/>
+                <Anchors>
+                    <Anchor point="LEFT" relativePoint="LEFT" x="10"/>
+                </Anchors>
+                <NormalTexture file="Interface/Buttons/WHITE8X8"/>
+                <HighlightTexture file="Interface/Buttons/WHITE8X8"
+                                  alphaMode="ADD">
+                    <Color r="1" g="1" b="1" a="0.25"/>
+                </HighlightTexture>
+            </Button>
+            <!-- Row label -->
+            <FontString parentKey="ColorLabel"
+                        inherits="GameFontHighlightSmall"
+                        justifyH="LEFT">
+                <Anchors>
+                    <!-- 10 (btn left) + 20 (btn width) + 6 (gap) = 36 -->
+                    <Anchor point="LEFT"  relativePoint="LEFT"  x="36"/>
+                    <Anchor point="RIGHT" relativePoint="RIGHT" x="-8"/>
+                </Anchors>
+            </FontString>
+        </Frames>
+    </Frame>
+
+</Ui>

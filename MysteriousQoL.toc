@@ -1,0 +1,45 @@
+## Interface: 120001
+## Title: MysteriousQoL
+## Notes: Mysterious quality of life improvements
+## Version: 1.1.2
+## SavedVariables: MysteriousQoLDB
+## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
+
+# Core -must load first
+Core/Init.lua
+Core/SettingsUI.lua
+Core/MinimapButton.lua
+
+# Feature modules
+General/Vendor.lua
+General/FasterLoot.lua
+General/LootWarnings.lua
+General/EasyDestroy.lua
+General/AutoKeystone.lua
+General/SkipQueueConfirm.lua
+General/QuestAutomation.lua
+General/AuctionHouseFilter.lua
+Fun/OwenWilson.lua
+Fun/Batman.lua
+Fun/Bloodlust.lua
+Fun/Blink.lua
+Fun/Sneaky.lua
+Fun/Rolling.lua
+Fun/Zoomies.lua
+Fun/Shame.lua
+Fun/Victory.lua
+Fun/VendorSound.lua
+UI/MouseRing.lua
+UI/HideSocial.lua
+UI/ChatCopy.lua
+UI/Dragonriding.lua
+Reminders/BuffReminder.lua
+Reminders/PetReminder.lua
+Reminders/DeathReminder.lua
+Reminders/OverloadReminder.lua
+Reminders/RepairReminder.lua
+Reminders/MailReminder.lua
+Reminders/Reminders.lua
+
+# Main entry point -must load last
+MysteriousQoL.lua
