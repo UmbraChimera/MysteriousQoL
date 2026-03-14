@@ -73,11 +73,8 @@ local function GetMatches(filter)
     filter = filter:lower()
     for i = 1, GetNumGuildMembers() do
         local name, rankName = GetGuildRosterInfo(i)
-        if name then
-            local bare = name:match("^([^%-]+)")
-            if bare:lower():find(filter, 1, true) then
-                table.insert(results, { name = bare, rank = rankName or "" })
-            end
+        if name and name:lower():find(filter, 1, true) then
+            table.insert(results, { name = name, rank = rankName or "" })
         end
     end
     table.sort(results, function(a, b) return a.name < b.name end)
@@ -209,7 +206,7 @@ end
 local function GetGuildMemberInfo(charName)
     for i = 1, GetNumGuildMembers() do
         local name, _, _, level, classDisplay, _, _, _, _, _, classToken = GetGuildRosterInfo(i)
-        if name and name:match("^([^%-]+)") == charName then
+        if name and name == charName then
             return level or 0, classDisplay or "", classToken or ""
         end
     end
@@ -524,7 +521,15 @@ local function HookButton(button)
         local info = self.memberInfo or (self.GetMemberInfo and self:GetMemberInfo())
         local name = info and info.name
         if not name or name == "" then return end
-        ShowForMember(name:match("^([^%-]+)") or name)
+        -- Resolve to the exact roster name (same source the panel uses)
+        for i = 1, GetNumGuildMembers() do
+            local rosterName = GetGuildRosterInfo(i)
+            if rosterName and (rosterName == name or rosterName:match("^([^%-]+)") == name) then
+                name = rosterName
+                break
+            end
+        end
+        ShowForMember(name)
     end)
 end
 

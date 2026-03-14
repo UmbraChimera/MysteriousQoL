@@ -95,7 +95,6 @@ addon.defaults = {
     guild_log_enabled           = true,
     guild_log_maxEntries        = 200,
     guild_sync_enabled          = true,
-    guild_writeOfficerNotes     = true,
     guild_panel_scale           = 1.0,
     settings_panel_scale        = 1.0,
 }

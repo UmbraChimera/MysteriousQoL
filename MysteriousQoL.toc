@@ -40,7 +40,6 @@ Reminders/OverloadReminder.lua
 Reminders/RepairReminder.lua
 Reminders/MailReminder.lua
 Reminders/Reminders.lua
-Guild/GRM_Import.lua
 Guild/GuildCore.lua
 Guild/GuildChat.lua
 Guild/GuildSync.lua

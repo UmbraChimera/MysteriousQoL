@@ -286,8 +286,7 @@ frame:SetScript("OnEvent", function(self, event, name)
         UI.Header("Sync")
         UI.Checkbox("guild_sync_enabled", "Sync Alt Data With Guildmates",
             "Broadcasts your alt group data to guild members who also have MysteriousQoL installed. Auto-syncs 30 seconds after login. Trusted rank is set via ^#MQoL:N#^ in Guild Info (default: rank 1 and above).")
-        UI.Checkbox("guild_writeOfficerNotes", "Write Main Tag to Officer Notes",
-            "When you add an alt to a group, writes [M:MainName] to their officer note. Requires officer rank. Never overwrites unrelated notes.")
+
 
         UI.Header("Log")
         UI.Checkbox("guild_log_enabled", "Activity Log",

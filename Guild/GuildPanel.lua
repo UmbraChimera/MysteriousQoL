@@ -3,10 +3,6 @@ local _, addon = ...
 local FONT    = "Fonts\\FRIZQT__.TTF"
 local BAR_TEX = [[Interface\Buttons\WHITE8x8]]
 
-local function StripRealm(name)
-    return name and name:match("^([^%-]+)") or name
-end
-
 local PW, PH      = 680, 540
 local LEFT_W      = 292   -- roster pane width
 local ROW_H       = 18
@@ -31,19 +27,11 @@ local detailNickLabel, detailNickBtn
 -- Right pane bottom: activity log
 local logEdit
 
--- Toolbar state
-local unlinkedOnly    = false
-local unlinkedOnlyBtn = nil
-local statsLabel      = nil
-
--- Import dialog
-local importDialog = nil
-
--- Join prompt state
-local promptFrame       = nil
-local promptQueue       = {}
-local promptNameLabel   = nil
-local currentPromptName = nil
+-- Filter state
+local rosterFilter  = "all"  -- "all", "mains", "alts", "unlinked"
+local onlineOnly    = false
+local radioAll, radioMains, radioAlts, radioUnlinked, onlineOnlyBtn
+local statsLabel    = nil
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +44,7 @@ end
 local function GetMemberInfo(charName)
     for i = 1, GetNumGuildMembers() do
         local name, _, _, level, classDisplay, _, publicNote, officerNote, _, _, classToken = GetGuildRosterInfo(i)
-        if name and (name == charName or name:match("^([^%-]+)") == charName) then
+        if name and (name == charName or (not charName:find("-", 1, true) and name:match("^([^%-]+)") == charName)) then
             return level or 0, classDisplay or "", classToken or "", publicNote or "", officerNote or ""
         end
     end
@@ -66,12 +54,15 @@ end
 local function BuildStatsText()
     local numTotal, _, numAccounts = GetNumGuildMembers()
     numTotal = numTotal or 0
-    local numMains = #addon.MI_Guild_GetAllGroups()
+    local groups = addon.MI_Guild_GetAllGroups()
+    local numMains = #groups
+    local numAlts = 0
+    for _, group in ipairs(groups) do numAlts = numAlts + #group.alts end
     local s = "|cff777777Members:|r " .. numTotal
     if numAccounts and numAccounts > 0 then
         s = s .. "   |cff777777Accounts:|r " .. numAccounts
     end
-    s = s .. "   |cff777777Tracked Mains:|r " .. numMains
+    s = s .. "   |cff777777Tracked Mains:|r " .. numMains .. "   |cff777777Tracked Alts:|r " .. numAlts
     return s
 end
 
@@ -112,12 +103,8 @@ local function GetGuildMemberMatches(filter)
     filter = filter:lower()
     for i = 1, GetNumGuildMembers() do
         local name, rankName = GetGuildRosterInfo(i)
-        if name then
-            local bare = StripRealm(name)
-            -- Match on bare name; display full name so cross-realm chars are distinguishable.
-            if bare:lower():find(filter, 1, true) or name:lower():find(filter, 1, true) then
-                table.insert(results, { name = name, bare = bare, rank = rankName or "" })
-            end
+        if name and name:lower():find(filter, 1, true) then
+            table.insert(results, { name = name, rank = rankName or "" })
         end
     end
     table.sort(results, function(a, b) return a.name < b.name end)
@@ -186,10 +173,11 @@ end
 
 local function BuildInputDialog()
     if inputDialog then return end
-    inputDialog = CreateFrame("Frame", "MysteriousQoL_GuildInput", panelFrame, "BackdropTemplate")
+    local parent = panelFrame or UIParent
+    inputDialog = CreateFrame("Frame", "MysteriousQoL_GuildInput", parent, "BackdropTemplate")
     inputDialog:SetSize(270, DIALOG_BASE_H)
     inputDialog:SetPoint("CENTER")
-    inputDialog:SetFrameLevel(panelFrame:GetFrameLevel() + 20)
+    inputDialog:SetFrameLevel(parent:GetFrameLevel() + 20)
     inputDialog:SetBackdrop(MakeBackdrop())
     inputDialog:SetBackdropColor(0.07, 0.07, 0.07, 0.98)
     inputDialog:SetBackdropBorderColor(0.55, 0.44, 0.12, 1)
@@ -210,8 +198,8 @@ local function BuildInputDialog()
     end)
     eb:SetScript("OnEnterPressed", function()
         local t = eb:GetText():match("^%s*(.-)%s*$")
-        if (t ~= "" or inputAllowEmpty) and inputCallback then inputCallback(t) end
         inputDialog:Hide()
+        if (t ~= "" or inputAllowEmpty) and inputCallback then inputCallback(t) end
     end)
     eb:SetScript("OnEscapePressed", function() inputDialog:Hide() end)
     inputDialog.editBox = eb
@@ -233,8 +221,8 @@ local function BuildInputDialog()
     okL:SetAllPoints(); okL:SetJustifyH("CENTER"); okL:SetText("OK")
     okBtn:SetScript("OnClick", function()
         local t = eb:GetText():match("^%s*(.-)%s*$")
-        if (t ~= "" or inputAllowEmpty) and inputCallback then inputCallback(t) end
         inputDialog:Hide()
+        if (t ~= "" or inputAllowEmpty) and inputCallback then inputCallback(t) end
     end)
 
     local cancelBtn = CreateFrame("Button", nil, inputDialog, "BackdropTemplate")
@@ -264,43 +252,24 @@ end
 local function BuildRosterEntries(filter)
     local entries = {}
     filter = filter and filter:lower() or ""
-    local claimedMain = {}   -- groupIdx -> true once a main entry is added
-    local claimedAlt  = {}   -- groupIdx.."\001"..bare -> true once an alt entry is added
     for i = 1, GetNumGuildMembers() do
-        local name, rankName, rankIndex, level, _, _, _, _, _, _, classToken = GetGuildRosterInfo(i)
+        local name, rankName, rankIndex, level, _, _, _, _, isOnline, _, classToken = GetGuildRosterInfo(i)
         if name then
-            local bare = StripRealm(name)
-            -- Use full name for lookup so cross-realm same-named chars resolve to distinct groups.
             local groupIdx, group, isMain = addon.MI_Guild_GetGroupForChar(name)
             local lf = filter ~= "" and filter or nil
             local matches = not lf
-                or bare:lower():find(lf, 1, true)
                 or name:lower():find(lf, 1, true)
-                or (group and StripRealm(group.main):lower():find(lf, 1, true))
+                or (group and group.main:lower():find(lf, 1, true))
                 or (group and group.nick and group.nick:lower():find(lf, 1, true))
-            if matches then
-                -- Deduplicate by full name within a group (protects against duplicate roster entries).
-                if groupIdx then
-                    if isMain then
-                        local key = groupIdx .. "\001main\001" .. name
-                        if claimedMain[key] then
-                            groupIdx, group, isMain = nil, nil, nil
-                        else
-                            claimedMain[key] = true
-                        end
-                    else
-                        local key = groupIdx .. "\001" .. name
-                        if claimedAlt[key] then
-                            groupIdx, group, isMain = nil, nil, nil
-                        else
-                            claimedAlt[key] = true
-                        end
-                    end
-                end
-                if not unlinkedOnly or not group then
+            if matches
+                and (rosterFilter == "all"
+                     or (rosterFilter == "mains"    and group and isMain)
+                     or (rosterFilter == "alts"     and group and not isMain)
+                     or (rosterFilter == "unlinked" and not group))
+                and (not onlineOnly or isOnline)
+            then
                 table.insert(entries, {
-                    name       = name,   -- full name (with realm if cross-realm)
-                    bare       = bare,   -- display name (no realm)
+                    name       = name,
                     rank       = rankName or "",
                     rankIdx    = rankIndex or 0,
                     groupIdx   = groupIdx,
@@ -309,16 +278,12 @@ local function BuildRosterEntries(filter)
                     level      = level or 0,
                     classToken = classToken or "",
                 })
-                end  -- unlinkedOnly gate
             end
         end
     end
-    -- Sort: alphabetical by main bare name, alts clustered under main, unlinked interleaved
     table.sort(entries, function(a, b)
-        local aMain = a.group and StripRealm(a.group.main) or a.bare
-        local bMain = b.group and StripRealm(b.group.main) or b.bare
-        local aKey = aMain .. "\001" .. (a.isMain and "\000" or a.bare)
-        local bKey = bMain .. "\001" .. (b.isMain and "\000" or b.bare)
+        local aKey = a.group and (a.group.main .. "\001" .. (a.isMain and "\000" or a.name)) or a.name
+        local bKey = b.group and (b.group.main .. "\001" .. (b.isMain and "\000" or b.name)) or b.name
         return aKey < bKey
     end)
     return entries
@@ -330,10 +295,37 @@ local function StatusText(entry)
         local alts = n > 0 and (" |cff444444(" .. n .. ")|r") or ""
         return "|cffffcc00Main|r" .. alts
     elseif entry.group then
-        return "|cff555555" .. (entry.group.nick or StripRealm(entry.group.main)) .. "|r"
+        return "|cff555555" .. (entry.group.nick or entry.group.main) .. "|r"
     else
         return "|cff2a2a2a-|r"
     end
+end
+
+-- ── Right-click context menu ───────────────────────────────────────────────────
+
+local function ShowRosterContextMenu(charName)
+    local groupIdx, group = addon.MI_Guild_GetGroupForChar(charName)
+    MenuUtil.CreateContextMenu(UIParent, function(_, rootDescription)
+        rootDescription:CreateTitle(charName)
+        rootDescription:CreateButton("Set as Main", function()
+            addon.MI_Guild_SetAsMain(charName)
+            addon.MI_GuildPanel_Refresh()
+        end)
+        rootDescription:CreateButton("Link as Alt to...", function()
+            ShowInputDialog("Link " .. charName .. " as alt of:", function(mainName)
+                if mainName and mainName ~= "" then
+                    addon.MI_Guild_LinkAltToMain(charName, mainName)
+                    addon.MI_GuildPanel_Refresh()
+                end
+            end)
+        end)
+        if group then
+            rootDescription:CreateButton("Unlink", function()
+                addon.MI_Guild_UnlinkChar(charName)
+                addon.MI_GuildPanel_Refresh()
+            end)
+        end
+    end)
 end
 
 -- ── Roster row pool ────────────────────────────────────────────────────────────
@@ -367,8 +359,12 @@ local function GetOrCreateRosterRow(i)
             self.hl:SetColorTexture(0, 0, 0, 0)
         end
     end)
-    row:SetScript("OnMouseUp", function(self)
+    row:SetScript("OnMouseUp", function(self, btn)
         if not self.entryName then return end
+        if btn == "RightButton" then
+            ShowRosterContextMenu(self.entryName)
+            return
+        end
         selectedName = self.entryName
         for _, r in ipairs(rosterRows) do
             r.hl:SetColorTexture(0, 0, 0, 0)
@@ -452,7 +448,7 @@ function addon.MI_GuildPanel_UpdateDetail(name)
     local infoStr = (level > 0 and classDisplay ~= "") and
         ("|cff888888" .. level .. " " .. classDisplay .. "|r  ") or ""
 
-    detailNameLabel:SetText(cc .. StripRealm(name) .. "|r")
+    detailNameLabel:SetText(cc .. name .. "|r")
 
     -- Notes
     local noteLines = {}
@@ -499,7 +495,7 @@ function addon.MI_GuildPanel_UpdateDetail(name)
         StyleButton(detailBtn2, 0.50, 0.40, 0.09)
         detailBtn2:Show()
         detailBtn2:SetScript("OnClick", function()
-            ShowInputDialog("Link " .. StripRealm(name) .. " as alt of:", function(mainName)
+            ShowInputDialog("Link " .. name .. " as alt of:", function(mainName)
                 addon.MI_Guild_LinkAltToMain(name, mainName)
                 addon.MI_GuildPanel_Refresh()
             end)
@@ -514,7 +510,7 @@ function addon.MI_GuildPanel_UpdateDetail(name)
         detailNickLabel:Show()
         detailNickBtn.lbl:SetText(nick and "Edit Nick" or "Set Nick")
         detailNickBtn:SetScript("OnClick", function()
-            ShowInputDialog("Nickname for " .. StripRealm(group.main) .. ":", function(newNick)
+            ShowInputDialog("Nickname for " .. group.main .. ":", function(newNick)
                 addon.MI_Guild_SetNick(groupIdx, newNick)
                 addon.MI_GuildPanel_Refresh()
             end, true, nick or "", true)
@@ -526,7 +522,7 @@ function addon.MI_GuildPanel_UpdateDetail(name)
         local n = #group.alts
         detailStatusLabel:SetText(infoStr .. "|cffffcc00Main|r" .. (n > 0 and (" - " .. n .. " alt" .. (n == 1 and "" or "s")) or ""))
     else
-        detailStatusLabel:SetText(infoStr .. "Alt of |cffffcc00" .. StripRealm(group.main) .. "|r")
+        detailStatusLabel:SetText(infoStr .. "Alt of |cffffcc00" .. group.main .. "|r")
     end
 
     -- Build linked character list: main first, then alts
@@ -546,7 +542,7 @@ function addon.MI_GuildPanel_UpdateDetail(name)
         local cColor = ClassColor(cToken)
         local cLvlStr = cLvl > 0 and ("|cff666666" .. cLvl .. "|r ") or ""
         local mainTag = isMn and "|cffffcc00[M]|r " or ""
-        row.nameLabel:SetText(mainTag .. cLvlStr .. cColor .. StripRealm(charName) .. "|r")
+        row.nameLabel:SetText(mainTag .. cLvlStr .. cColor .. charName .. "|r")
         row.hl:SetColorTexture(0.25, 0.2, 0.05, isCurrent and 0.16 or 0)
 
         if isMn then
@@ -564,7 +560,7 @@ function addon.MI_GuildPanel_UpdateDetail(name)
     StyleButton(detailBtn1, 0.50, 0.40, 0.09)
     detailBtn1:Show()
     detailBtn1:SetScript("OnClick", function()
-        ShowInputDialog("Add alt to " .. StripRealm(group.main) .. ":", function(altName)
+        ShowInputDialog("Add alt to " .. group.main .. ":", function(altName)
             addon.MI_Guild_LinkAltToMain(altName, group.main)
             addon.MI_GuildPanel_Refresh()
         end)
@@ -642,9 +638,9 @@ local function BuildRosterList()
         local cc = ClassColor(entry.classToken)
         local lvl = entry.level > 0 and ("|cff666666" .. entry.level .. "|r ") or ""
         if entry.group and not entry.isMain then
-            row.nameLabel:SetText("  " .. lvl .. cc .. entry.bare .. "|r")
+            row.nameLabel:SetText("  " .. lvl .. cc .. entry.name .. "|r")
         else
-            row.nameLabel:SetText(lvl .. cc .. entry.bare .. "|r")
+            row.nameLabel:SetText(lvl .. cc .. entry.name .. "|r")
         end
         row.statusLabel:SetText(StatusText(entry))
 
@@ -723,7 +719,6 @@ local function BuildPanel()
 
     local closeBtn = CreateFrame("Button", nil, panelFrame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -2, -2)
-    closeBtn:SetFrameLevel(panelFrame:GetFrameLevel() + 1)
     closeBtn:SetScript("OnClick", function() panelFrame:Hide() end)
 
     -- ── Toolbar ──────────────────────────────────────────────────────────────
@@ -742,24 +737,7 @@ local function BuildPanel()
     MakeToolbarButton("Sync Now", 8, function()
         addon.MI_GuildSync_Broadcast()
     end)
-    MakeToolbarButton("Clear Log", 102, function()
-        addon.MI_GuildLog_Clear()
-        addon.MI_GuildPanel_Refresh()
-    end)
 
-    unlinkedOnlyBtn = MakeToolbarButton("Unlinked Only", 196, function()
-        unlinkedOnly = not unlinkedOnly
-        local r = unlinkedOnly and 0.6 or 0.50
-        local g = unlinkedOnly and 0.5 or 0.40
-        local b = unlinkedOnly and 0.1 or 0.09
-        StyleButton(unlinkedOnlyBtn, r, g, b)
-        BuildRosterList()
-    end)
-    MakeToolbarButton("Import Log", 290, function()
-        BuildImportDialog()
-        importDialog:Show()
-        importDialog.editBox:SetFocus()
-    end)
 
     -- Search / filter box
     local searchLabel = MakeLabel(panelFrame, FONT, 10, 0.50, 0.42, 0.12)
@@ -793,20 +771,63 @@ local function BuildPanel()
 
     local contentTop = -54  -- Y from panel top
 
-    -- Column header labels
-    local rosterHdr = MakeLabel(panelFrame, FONT, 9, 0.50, 0.42, 0.12)
-    rosterHdr:SetPoint("TOPLEFT", 8, contentTop + 2)
-    rosterHdr:SetText("MEMBER")
+    -- Radio row: All / Mains / Alts / Unlinked (mutually exclusive) + Online Only checkbox
+    local function UpdateRosterRadios()
+        radioAll:SetChecked(rosterFilter == "all")
+        radioMains:SetChecked(rosterFilter == "mains")
+        radioAlts:SetChecked(rosterFilter == "alts")
+        radioUnlinked:SetChecked(rosterFilter == "unlinked")
+        onlineOnlyBtn:SetChecked(onlineOnly)
+    end
 
-    local statusHdr = MakeLabel(panelFrame, FONT, 9, 0.50, 0.42, 0.12)
-    statusHdr:SetPoint("TOPRIGHT", -(PW - LEFT_W - 8), contentTop + 2)
-    statusHdr:SetText("STATUS")
+    local function MakeRadioOption(label, x)
+        local btn = CreateFrame("CheckButton", "MIGuildRadio_"..label, panelFrame, "UIRadioButtonTemplate")
+        btn:SetPoint("TOPLEFT", x, contentTop + 2)
+        local lbl = panelFrame:CreateFontString(nil, "OVERLAY")
+        lbl:SetFont(FONT, 10, "")
+        lbl:SetTextColor(0.85, 0.75, 0.45)
+        lbl:SetPoint("LEFT", btn, "RIGHT", 2, 0)
+        lbl:SetText(label)
+        btn.myLabel = lbl
+        return btn
+    end
+
+    radioAll      = MakeRadioOption("All",      4)
+    radioMains    = MakeRadioOption("Mains",    46)
+    radioAlts     = MakeRadioOption("Alts",     96)
+    radioUnlinked = MakeRadioOption("Unlinked", 140)
+
+    onlineOnlyBtn = CreateFrame("CheckButton", "MIGuildOnlineOnly", panelFrame, "UICheckButtonTemplate")
+    onlineOnlyBtn:SetSize(18, 18)
+    onlineOnlyBtn:SetPoint("TOPLEFT", 212, contentTop + 1)
+    local onlineLbl = panelFrame:CreateFontString(nil, "OVERLAY")
+    onlineLbl:SetFont(FONT, 10, "")
+    onlineLbl:SetTextColor(0.85, 0.75, 0.45)
+    onlineLbl:SetPoint("LEFT", onlineOnlyBtn, "RIGHT", 2, 0)
+    onlineLbl:SetText("Online Only")
+
+    radioAll:SetScript("OnClick", function()
+        rosterFilter = "all"; UpdateRosterRadios(); BuildRosterList()
+    end)
+    radioMains:SetScript("OnClick", function()
+        rosterFilter = "mains"; UpdateRosterRadios(); BuildRosterList()
+    end)
+    radioAlts:SetScript("OnClick", function()
+        rosterFilter = "alts"; UpdateRosterRadios(); BuildRosterList()
+    end)
+    radioUnlinked:SetScript("OnClick", function()
+        rosterFilter = "unlinked"; UpdateRosterRadios(); BuildRosterList()
+    end)
+    onlineOnlyBtn:SetScript("OnClick", function()
+        onlineOnly = onlineOnlyBtn:GetChecked(); BuildRosterList()
+    end)
+    UpdateRosterRadios()
 
     local detailHdr = MakeLabel(panelFrame, FONT, 9, 0.50, 0.42, 0.12)
     detailHdr:SetPoint("TOPLEFT", LEFT_W + 16, contentTop + 2)
     detailHdr:SetText("SELECTED CHARACTER")
 
-    local listTop = contentTop - 14
+    local listTop = contentTop - 22
 
     -- Vertical divider
     local divider = panelFrame:CreateTexture(nil, "ARTWORK")
@@ -852,20 +873,14 @@ local function BuildPanel()
         gripStartX = select(1, GetCursorPosition())
         gripStartScale = panelFrame:GetScale()
     end)
-    grip:SetScript("OnMouseUp", function()
-        if gripDragging then
-            local snapped = math.floor(panelFrame:GetScale() / 0.05 + 0.5) * 0.05
-            snapped = math.max(0.6, math.min(2.0, snapped))
-            addon.db.guild_panel_scale = snapped
-            panelFrame:SetScale(snapped)
-        end
-        gripDragging = false
-    end)
+    grip:SetScript("OnMouseUp", function() gripDragging = false end)
     grip:SetScript("OnUpdate", function()
         if not gripDragging then return end
         local cx = select(1, GetCursorPosition())
-        local newScale = math.max(0.6, math.min(2.0, gripStartScale + (cx - gripStartX) / 600))
-        panelFrame:SetScale(newScale)
+        local newScale = math.max(0.6, math.min(1.4, gripStartScale + (cx - gripStartX) / 600))
+        local snapped = math.floor(newScale / 0.05 + 0.5) * 0.05
+        addon.db.guild_panel_scale = snapped
+        panelFrame:SetScale(snapped)
     end)
 
     -- ── Left pane: roster scroll ──────────────────────────────────────────────
@@ -1076,6 +1091,7 @@ function addon.MI_GuildPanel_Toggle()
     end
 end
 
+
 function addon.MI_GuildPanel_Refresh()
     if not panelFrame then return end
     BuildRosterList()
@@ -1088,197 +1104,4 @@ function addon.MI_GuildPanel_Refresh()
             logScroll:SetVerticalScroll(0)
         end
     end)
-end
-
--- ── GRM log import dialog ─────────────────────────────────────────────────────
-
-function BuildImportDialog()
-    if importDialog then return end
-    importDialog = CreateFrame("Frame", "MysteriousQoL_GuildImport", UIParent, "BackdropTemplate")
-    importDialog:SetSize(520, 400)
-    importDialog:SetPoint("CENTER")
-    importDialog:SetFrameStrata("DIALOG")
-    importDialog:SetBackdrop(MakeBackdrop())
-    importDialog:SetBackdropColor(0.07, 0.07, 0.07, 0.98)
-    importDialog:SetBackdropBorderColor(0.55, 0.44, 0.12, 1)
-    importDialog:SetMovable(true)
-    importDialog:EnableMouse(true)
-    importDialog:RegisterForDrag("LeftButton")
-    importDialog:SetScript("OnDragStart", importDialog.StartMoving)
-    importDialog:SetScript("OnDragStop", importDialog.StopMovingOrSizing)
-    table.insert(UISpecialFrames, "MysteriousQoL_GuildImport")
-    importDialog:Hide()
-
-    local accent = importDialog:CreateTexture(nil, "ARTWORK")
-    accent:SetHeight(2)
-    accent:SetPoint("TOPLEFT", 1, -1); accent:SetPoint("TOPRIGHT", -1, -1)
-    accent:SetColorTexture(0.75, 0.60, 0.12, 1)
-
-    local title = MakeLabel(importDialog, FONT, 12, 0.9, 0.76, 0.22)
-    title:SetPoint("TOPLEFT", 10, -10)
-    title:SetText("Import GRM Log")
-
-    local hint = MakeLabel(importDialog, FONT, 9, 0.5, 0.5, 0.5)
-    hint:SetPoint("TOPLEFT", 10, -26)
-    hint:SetPoint("TOPRIGHT", -10, -26)
-    hint:SetJustifyH("LEFT")
-    hint:SetText("Paste the contents of your GRM log .json export, then click Import.")
-
-    local sep = importDialog:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1)
-    sep:SetPoint("TOPLEFT", 1, -42)
-    sep:SetPoint("TOPRIGHT", -1, -42)
-    sep:SetColorTexture(0.45, 0.35, 0.08, 0.5)
-
-    local scroll = CreateFrame("ScrollFrame", nil, importDialog)
-    scroll:SetPoint("TOPLEFT", 6, -46)
-    scroll:SetPoint("BOTTOMRIGHT", -6, 36)
-    scroll:EnableMouseWheel(true)
-    scroll:SetScript("OnMouseWheel", function(self, delta)
-        local cur = self:GetVerticalScroll()
-        local max = self:GetVerticalScrollRange()
-        self:SetVerticalScroll(math.max(0, math.min(max, cur - delta * 20)))
-    end)
-
-    local eb = CreateFrame("EditBox", nil, scroll, "BackdropTemplate")
-    eb:SetMultiLine(true)
-    eb:SetMaxLetters(0)
-    eb:SetAutoFocus(false)
-    eb:SetFont(FONT, 10, "")
-    eb:SetTextColor(0.85, 0.85, 0.85, 1)
-    eb:SetWidth(506)
-    eb:SetBackdrop(MakeBackdrop())
-    eb:SetBackdropColor(0.04, 0.04, 0.04, 1)
-    eb:SetBackdropBorderColor(0.25, 0.20, 0.05, 0.6)
-    eb:SetScript("OnEscapePressed", function() importDialog:Hide() end)
-    scroll:SetScrollChild(eb)
-    importDialog.editBox = eb
-
-    local importBtn = CreateFrame("Button", nil, importDialog, "BackdropTemplate")
-    importBtn:SetSize(90, 24)
-    importBtn:SetPoint("BOTTOMLEFT", 8, 6)
-    StyleButton(importBtn, 0.50, 0.40, 0.09)
-    local impL = MakeLabel(importBtn, FONT, 11, 0.9, 0.76, 0.22)
-    impL:SetAllPoints(); impL:SetJustifyH("CENTER"); impL:SetText("Import")
-    importBtn:SetScript("OnClick", function()
-        local text = eb:GetText()
-        if text ~= "" and addon.MI_GuildImport_ParseGRMLog then
-            local joins = addon.MI_GuildImport_ParseGRMLog(text)
-            print(string.format("|cff80c0ffMQoL:|r GRM import: %d join dates imported.", joins))
-            if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
-        end
-        eb:SetText("")
-        importDialog:Hide()
-    end)
-
-    local clearBtn = CreateFrame("Button", nil, importDialog, "BackdropTemplate")
-    clearBtn:SetSize(70, 24)
-    clearBtn:SetPoint("BOTTOMLEFT", 104, 6)
-    StyleButton(clearBtn, 0.35, 0.35, 0.35)
-    local clrL = MakeLabel(clearBtn, FONT, 11, 0.7, 0.7, 0.7)
-    clrL:SetAllPoints(); clrL:SetJustifyH("CENTER"); clrL:SetText("Clear")
-    clearBtn:SetScript("OnClick", function() eb:SetText("") end)
-
-    local cancelBtn = CreateFrame("Button", nil, importDialog, "BackdropTemplate")
-    cancelBtn:SetSize(70, 24)
-    cancelBtn:SetPoint("BOTTOMRIGHT", -8, 6)
-    StyleButton(cancelBtn, 0.5, 0.1, 0.1)
-    local canL = MakeLabel(cancelBtn, FONT, 11, 1, 0.4, 0.4)
-    canL:SetAllPoints(); canL:SetJustifyH("CENTER"); canL:SetText("Cancel")
-    cancelBtn:SetScript("OnClick", function() importDialog:Hide() end)
-end
-
--- ── New member join prompt ─────────────────────────────────────────────────────
-
-local function ShowNextPrompt()
-    if #promptQueue == 0 then
-        if promptFrame then promptFrame:Hide() end
-        currentPromptName = nil
-        return
-    end
-    currentPromptName = table.remove(promptQueue, 1)
-
-    if not promptFrame then
-        promptFrame = CreateFrame("Frame", "MysteriousQoL_JoinPrompt", UIParent, "BackdropTemplate")
-        promptFrame:SetSize(320, 76)
-        promptFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 200)
-        promptFrame:SetFrameStrata("HIGH")
-        promptFrame:SetBackdrop(MakeBackdrop())
-        promptFrame:SetBackdropColor(0.07, 0.07, 0.07, 0.96)
-        promptFrame:SetBackdropBorderColor(0.55, 0.44, 0.12, 1)
-        promptFrame:SetMovable(true)
-        promptFrame:EnableMouse(true)
-        promptFrame:RegisterForDrag("LeftButton")
-        promptFrame:SetScript("OnDragStart", promptFrame.StartMoving)
-        promptFrame:SetScript("OnDragStop", promptFrame.StopMovingOrSizing)
-
-        local accent2 = promptFrame:CreateTexture(nil, "ARTWORK")
-        accent2:SetHeight(2)
-        accent2:SetPoint("TOPLEFT", 1, -1); accent2:SetPoint("TOPRIGHT", -1, -1)
-        accent2:SetColorTexture(0.75, 0.60, 0.12, 1)
-
-        promptNameLabel = MakeLabel(promptFrame, FONT, 11, 0.9, 0.76, 0.22)
-        promptNameLabel:SetPoint("TOPLEFT", 8, -10)
-        promptNameLabel:SetPoint("TOPRIGHT", -8, -10)
-        promptNameLabel:SetJustifyH("LEFT")
-
-        local tagHint = MakeLabel(promptFrame, FONT, 9, 0.5, 0.5, 0.5)
-        tagHint:SetPoint("TOPLEFT", 8, -26)
-        tagHint:SetText("Tag this member:")
-
-        local function MakePromptBtn(label, x, w, onClick)
-            local btn = CreateFrame("Button", nil, promptFrame, "BackdropTemplate")
-            btn:SetSize(w, 20)
-            btn:SetPoint("BOTTOMLEFT", x, 8)
-            StyleButton(btn, 0.50, 0.40, 0.09)
-            local lbl = MakeLabel(btn, FONT, 10, 0.9, 0.76, 0.22)
-            lbl:SetAllPoints(); lbl:SetJustifyH("CENTER"); lbl:SetText(label)
-            btn:SetScript("OnClick", onClick)
-            return btn
-        end
-
-        MakePromptBtn("Link as Alt...", 8, 104, function()
-            local name = currentPromptName
-            ShowNextPrompt()
-            if not panelFrame then BuildPanel() end
-            if not panelFrame:IsShown() then
-                panelFrame:Show()
-                addon.MI_GuildPanel_Refresh()
-            end
-            ShowInputDialog("Enter main name for " .. name .. ":", function(mainName)
-                if mainName and mainName ~= "" then
-                    addon.MI_Guild_LinkAltToMain(name, mainName)
-                    addon.MI_GuildPanel_Refresh()
-                end
-            end)
-        end)
-
-        MakePromptBtn("New Main", 118, 88, function()
-            if currentPromptName then
-                addon.MI_Guild_CreateGroup(currentPromptName)
-                if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
-            end
-            ShowNextPrompt()
-        end)
-
-        MakePromptBtn("Dismiss", 212, 100, function()
-            ShowNextPrompt()
-        end)
-    end
-
-    promptNameLabel:SetText(currentPromptName .. " joined the guild")
-    promptFrame:Show()
-end
-
-function addon.MI_GuildPanel_PromptNewMember(name)
-    if not addon.db.guild_alts_enabled then return end
-    -- Avoid queuing the same name twice
-    if currentPromptName == name then return end
-    for _, n in ipairs(promptQueue) do
-        if n == name then return end
-    end
-    table.insert(promptQueue, name)
-    if not promptFrame or not promptFrame:IsShown() then
-        ShowNextPrompt()
-    end
 end
