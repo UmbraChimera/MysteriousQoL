@@ -79,7 +79,3 @@ function addon.MI_GuildLog_GetEntries()
     return GetLog() or {}
 end
 
-function addon.MI_GuildLog_Clear()
-    local log = GetLog()
-    if log then wipe(log) end
-end

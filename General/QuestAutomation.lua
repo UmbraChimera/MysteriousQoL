@@ -54,25 +54,19 @@ f:SetScript("OnEvent", function(_, event)
     if event == "QUEST_GREETING" or event == "GOSSIP_SHOW" then
         -- Try turn-in first (completed quests take priority)
         if addon.db.general_autoQuestTurnIn then
-            local activeQuests = C_GossipInfo.GetActiveQuests and C_GossipInfo.GetActiveQuests()
-            if activeQuests then
-                for _, quest in ipairs(activeQuests) do
-                    if quest.isComplete then
-                        C_GossipInfo.SelectActiveQuest(quest.questID)
-                        return
-                    end
+            for _, quest in ipairs(C_GossipInfo.GetActiveQuests()) do
+                if quest.isComplete then
+                    C_GossipInfo.SelectActiveQuest(quest.questID)
+                    return
                 end
             end
         end
 
         -- Then try accept (available quests)
         if addon.db.general_autoQuestAccept then
-            local availableQuests = C_GossipInfo.GetAvailableQuests and C_GossipInfo.GetAvailableQuests()
-            if availableQuests then
-                for _, quest in ipairs(availableQuests) do
-                    C_GossipInfo.SelectAvailableQuest(quest.questID)
-                    return
-                end
+            for _, quest in ipairs(C_GossipInfo.GetAvailableQuests()) do
+                C_GossipInfo.SelectAvailableQuest(quest.questID)
+                return
             end
         end
 

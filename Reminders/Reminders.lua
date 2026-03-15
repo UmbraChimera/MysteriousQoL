@@ -81,7 +81,6 @@ local function AnyReminderEnabled()
         or db.combat_petIdleReminder_enabled
         or db.combat_deathReminder_enabled
         or db.combat_deathReleaseProtection
-        or db.combat_overloadReminder_enabled
         or db.combat_repairReminder_enabled
 end
 

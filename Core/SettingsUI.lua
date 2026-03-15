@@ -753,7 +753,7 @@ local function BuildMainFrame()
     grip:SetScript("OnMouseDown", function(_, btn)
         if btn ~= "LeftButton" then return end
         gripDragging = true
-        gripStartX = select(1, GetCursorPosition())
+        gripStartX = GetCursorPosition()
         gripStartScale = mainFrame:GetScale()
     end)
     grip:SetScript("OnMouseUp", function()
@@ -767,7 +767,7 @@ local function BuildMainFrame()
     end)
     grip:SetScript("OnUpdate", function()
         if not gripDragging then return end
-        local cx = select(1, GetCursorPosition())
+        local cx = GetCursorPosition()
         local newScale = math.max(0.6, math.min(2.0, gripStartScale + (cx - gripStartX) / 500))
         mainFrame:SetScale(newScale)
     end)
@@ -811,10 +811,3 @@ function addon.customUI.Toggle()
     end
 end
 
-function addon.customUI.Show()
-    if mainFrame then mainFrame:Show() end
-end
-
-function addon.customUI.Hide()
-    if mainFrame then mainFrame:Hide() end
-end

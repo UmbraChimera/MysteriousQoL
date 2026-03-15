@@ -27,14 +27,14 @@ local function MakeBackdrop()
     }
 end
 
-local function MakeFS(parent, size, r, g, b)
+local function MakeLabel(parent, size, r, g, b)
     local fs = parent:CreateFontString(nil, "OVERLAY")
     fs:SetFont(FONT, size or 11, "")
     fs:SetTextColor(r or 1, g or 1, b or 1, 1)
     return fs
 end
 
-local function StyleBtn(btn, r, g, b)
+local function StyleButton(btn, r, g, b)
     btn:SetBackdrop(MakeBackdrop())
     btn:SetBackdropColor(0.08, 0.08, 0.08, 0.9)
     btn:SetBackdropBorderColor(r, g, b, 0.65)
@@ -42,30 +42,30 @@ local function StyleBtn(btn, r, g, b)
     btn:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(r, g, b, 0.65) end)
 end
 
-local function MakeBtn(parent, w, label, r, g, b, onClick)
+local function MakeButton(parent, w, label, r, g, b, onClick)
     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
     btn:SetSize(w, 20)
-    StyleBtn(btn, r, g, b)
-    local fs = MakeFS(btn, 10, math.min(r * 1.5, 1), math.min(g * 1.5, 1), math.min(b * 1.5, 1))
-    fs:SetAllPoints()
-    fs:SetJustifyH("CENTER")
-    fs:SetText(label)
-    btn.lbl = fs
+    StyleButton(btn, r, g, b)
+    local lbl = MakeLabel(btn, 10, math.min(r * 1.5, 1), math.min(g * 1.5, 1), math.min(b * 1.5, 1))
+    lbl:SetAllPoints()
+    lbl:SetJustifyH("CENTER")
+    lbl:SetText(label)
+    btn.lbl = lbl
     if onClick then btn:SetScript("OnClick", onClick) end
     return btn
 end
 
 -- ── Autocomplete dialog (reused from GuildPanel pattern) ──────────────────────
 
-local acDialog, acCallback, acAcFrame, acRows, acSuppressAC = nil, nil, nil, {}, false
-local AC_MAX = 8
-local AC_ROW_H = 20
-local AC_BASE_H = 88
+local inputDialog, autocompleteCallback, autocompleteFrame, autocompleteRows, suppressAutocomplete = nil, nil, nil, {}, false
+local MAX_AUTOCOMPLETE = 8
+local AUTOCOMPLETE_ROW_H = 20
+local INPUT_DIALOG_H = 88
 
-local function HideAC()
-    if acAcFrame then acAcFrame:Hide() end
-    for _, r in ipairs(acRows) do r:Hide() end
-    if acDialog then acDialog:SetHeight(AC_BASE_H) end
+local function HideAutocomplete()
+    if autocompleteFrame then autocompleteFrame:Hide() end
+    for _, r in ipairs(autocompleteRows) do r:Hide() end
+    if inputDialog then inputDialog:SetHeight(INPUT_DIALOG_H) end
 end
 
 local function GetMatches(filter)
@@ -78,127 +78,127 @@ local function GetMatches(filter)
         end
     end
     table.sort(results, function(a, b) return a.name < b.name end)
-    if #results > AC_MAX then
+    if #results > MAX_AUTOCOMPLETE then
         local t = {}
-        for i = 1, AC_MAX do t[i] = results[i] end
+        for i = 1, MAX_AUTOCOMPLETE do t[i] = results[i] end
         return t
     end
     return results
 end
 
-local function UpdateAC(text)
-    if not acAcFrame then return end
+local function UpdateAutocomplete(text)
+    if not autocompleteFrame then return end
     text = text:match("^%s*(.-)%s*$")
-    if text == "" then HideAC(); return end
+    if text == "" then HideAutocomplete(); return end
     local results = GetMatches(text)
-    if #results == 0 then HideAC(); return end
+    if #results == 0 then HideAutocomplete(); return end
 
     for i = 1, #results do
-        if not acRows[i] then
-            local row = CreateFrame("Button", nil, acAcFrame)
-            row:SetHeight(AC_ROW_H)
+        if not autocompleteRows[i] then
+            local row = CreateFrame("Button", nil, autocompleteFrame)
+            row:SetHeight(AUTOCOMPLETE_ROW_H)
             row:SetPoint("LEFT", 0, 0)
             row:SetPoint("RIGHT", 0, 0)
             local bg = row:CreateTexture(nil, "BACKGROUND")
             bg:SetAllPoints(); bg:SetColorTexture(0, 0, 0, 0); row.bg = bg
-            local nl = MakeFS(row, 11); nl:SetPoint("LEFT", 8, 0)
-            nl:SetPoint("RIGHT", -60, 0); nl:SetJustifyH("LEFT"); row.nl = nl
-            local rl = MakeFS(row, 9, 0.45, 0.45, 0.45)
-            rl:SetPoint("RIGHT", -4, 0); rl:SetJustifyH("RIGHT"); row.rl = rl
+            local nameLabel = MakeLabel(row, 11); nameLabel:SetPoint("LEFT", 8, 0)
+            nameLabel:SetPoint("RIGHT", -60, 0); nameLabel:SetJustifyH("LEFT"); row.nameLabel = nameLabel
+            local rankLabel = MakeLabel(row, 9, 0.45, 0.45, 0.45)
+            rankLabel:SetPoint("RIGHT", -4, 0); rankLabel:SetJustifyH("RIGHT"); row.rankLabel = rankLabel
             row:SetScript("OnEnter", function(self)
                 self.bg:SetColorTexture(0.22, 0.18, 0.04, 0.35)
-                self.nl:SetTextColor(1, 0.88, 0.3, 1)
+                self.nameLabel:SetTextColor(1, 0.88, 0.3, 1)
             end)
             row:SetScript("OnLeave", function(self)
                 self.bg:SetColorTexture(0, 0, 0, 0)
-                self.nl:SetTextColor(1, 1, 1, 1)
+                self.nameLabel:SetTextColor(1, 1, 1, 1)
             end)
             row:SetScript("OnClick", function(self)
-                acSuppressAC = true
-                acDialog.eb:SetText(self.memberName)
-                acSuppressAC = false
-                HideAC()
-                acDialog.eb:SetCursorPosition(#self.memberName)
+                suppressAutocomplete = true
+                inputDialog.editBox:SetText(self.memberName)
+                suppressAutocomplete = false
+                HideAutocomplete()
+                inputDialog.editBox:SetCursorPosition(#self.memberName)
             end)
-            acRows[i] = row
+            autocompleteRows[i] = row
         end
     end
     for i, data in ipairs(results) do
-        local row = acRows[i]
-        row:SetPoint("TOPLEFT", acAcFrame, "TOPLEFT", 0, -(i - 1) * AC_ROW_H)
+        local row = autocompleteRows[i]
+        row:SetPoint("TOPLEFT", autocompleteFrame, "TOPLEFT", 0, -(i - 1) * AUTOCOMPLETE_ROW_H)
         row.memberName = data.name
-        row.nl:SetText(data.name); row.rl:SetText(data.rank); row:Show()
+        row.nameLabel:SetText(data.name); row.rankLabel:SetText(data.rank); row:Show()
     end
-    for i = #results + 1, #acRows do acRows[i]:Hide() end
-    local h = #results * AC_ROW_H
-    acAcFrame:SetHeight(h); acAcFrame:Show()
-    acDialog:SetHeight(AC_BASE_H + h + 2)
+    for i = #results + 1, #autocompleteRows do autocompleteRows[i]:Hide() end
+    local h = #results * AUTOCOMPLETE_ROW_H
+    autocompleteFrame:SetHeight(h); autocompleteFrame:Show()
+    inputDialog:SetHeight(INPUT_DIALOG_H + h + 2)
 end
 
-local function BuildAcDialog()
-    if acDialog then return end
-    acDialog = CreateFrame("Frame", "MysteriousQoL_CommAcInput", UIParent, "BackdropTemplate")
-    acDialog:SetSize(260, AC_BASE_H)
-    acDialog:SetPoint("CENTER")
-    acDialog:SetFrameStrata("FULLSCREEN_DIALOG")
-    acDialog:SetBackdrop(MakeBackdrop())
-    acDialog:SetBackdropColor(0.07, 0.07, 0.07, 0.98)
-    acDialog:SetBackdropBorderColor(0.55, 0.44, 0.12, 1)
-    acDialog:Hide()
+local function BuildInputDialog()
+    if inputDialog then return end
+    inputDialog = CreateFrame("Frame", "MysteriousQoL_CommAcInput", UIParent, "BackdropTemplate")
+    inputDialog:SetSize(260, INPUT_DIALOG_H)
+    inputDialog:SetPoint("CENTER")
+    inputDialog:SetFrameStrata("FULLSCREEN_DIALOG")
+    inputDialog:SetBackdrop(MakeBackdrop())
+    inputDialog:SetBackdropColor(0.07, 0.07, 0.07, 0.98)
+    inputDialog:SetBackdropBorderColor(0.55, 0.44, 0.12, 1)
+    inputDialog:Hide()
 
-    acDialog.title = MakeFS(acDialog, 11, 0.9, 0.76, 0.22)
-    acDialog.title:SetPoint("TOPLEFT", 8, -8)
+    inputDialog.title = MakeLabel(inputDialog, 11, 0.9, 0.76, 0.22)
+    inputDialog.title:SetPoint("TOPLEFT", 8, -8)
 
-    local eb = CreateFrame("EditBox", nil, acDialog, "BackdropTemplate")
-    eb:SetSize(242, 22); eb:SetPoint("TOP", 0, -28)
-    eb:SetFont(FONT, 11, ""); eb:SetTextColor(1, 1, 1, 1)
-    eb:SetAutoFocus(true)
-    eb:SetBackdrop(MakeBackdrop())
-    eb:SetBackdropColor(0.04, 0.04, 0.04, 1)
-    eb:SetBackdropBorderColor(0.40, 0.32, 0.08, 0.8)
-    eb:SetScript("OnTextChanged", function()
-        if acSuppressAC then return end
-        UpdateAC(eb:GetText())
+    local editBox = CreateFrame("EditBox", nil, inputDialog, "BackdropTemplate")
+    editBox:SetSize(242, 22); editBox:SetPoint("TOP", 0, -28)
+    editBox:SetFont(FONT, 11, ""); editBox:SetTextColor(1, 1, 1, 1)
+    editBox:SetAutoFocus(true)
+    editBox:SetBackdrop(MakeBackdrop())
+    editBox:SetBackdropColor(0.04, 0.04, 0.04, 1)
+    editBox:SetBackdropBorderColor(0.40, 0.32, 0.08, 0.8)
+    editBox:SetScript("OnTextChanged", function()
+        if suppressAutocomplete then return end
+        UpdateAutocomplete(editBox:GetText())
     end)
-    eb:SetScript("OnEnterPressed", function()
-        local t = eb:GetText():match("^%s*(.-)%s*$")
-        if t ~= "" and acCallback then acCallback(t) end
-        acDialog:Hide()
+    editBox:SetScript("OnEnterPressed", function()
+        local t = editBox:GetText():match("^%s*(.-)%s*$")
+        if t ~= "" and autocompleteCallback then autocompleteCallback(t) end
+        inputDialog:Hide()
     end)
-    eb:SetScript("OnEscapePressed", function() acDialog:Hide() end)
-    acDialog.eb = eb
+    editBox:SetScript("OnEscapePressed", function() inputDialog:Hide() end)
+    inputDialog.editBox = editBox
 
-    acAcFrame = CreateFrame("Frame", nil, acDialog, "BackdropTemplate")
-    acAcFrame:SetPoint("TOPLEFT", eb, "BOTTOMLEFT", 0, -2)
-    acAcFrame:SetPoint("TOPRIGHT", eb, "BOTTOMRIGHT", 0, -2)
-    acAcFrame:SetHeight(0)
-    acAcFrame:SetFrameLevel(acDialog:GetFrameLevel() + 5)
-    acAcFrame:SetBackdrop(MakeBackdrop())
-    acAcFrame:SetBackdropColor(0.08, 0.07, 0.03, 0.97)
-    acAcFrame:SetBackdropBorderColor(0.35, 0.28, 0.07, 0.6)
-    acAcFrame:Hide()
+    autocompleteFrame = CreateFrame("Frame", nil, inputDialog, "BackdropTemplate")
+    autocompleteFrame:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -2)
+    autocompleteFrame:SetPoint("TOPRIGHT", editBox, "BOTTOMRIGHT", 0, -2)
+    autocompleteFrame:SetHeight(0)
+    autocompleteFrame:SetFrameLevel(inputDialog:GetFrameLevel() + 5)
+    autocompleteFrame:SetBackdrop(MakeBackdrop())
+    autocompleteFrame:SetBackdropColor(0.08, 0.07, 0.03, 0.97)
+    autocompleteFrame:SetBackdropBorderColor(0.35, 0.28, 0.07, 0.6)
+    autocompleteFrame:Hide()
 
-    local ok = MakeBtn(acDialog, 70, "OK", 0.50, 0.40, 0.09, function()
-        local t = eb:GetText():match("^%s*(.-)%s*$")
-        if t ~= "" and acCallback then acCallback(t) end
-        acDialog:Hide()
+    local ok = MakeButton(inputDialog, 70, "OK", 0.50, 0.40, 0.09, function()
+        local t = editBox:GetText():match("^%s*(.-)%s*$")
+        if t ~= "" and autocompleteCallback then autocompleteCallback(t) end
+        inputDialog:Hide()
     end)
     ok:SetPoint("BOTTOMLEFT", 8, 8)
 
-    local cancel = MakeBtn(acDialog, 70, "Cancel", 0.5, 0.1, 0.1,
-        function() acDialog:Hide() end)
+    local cancel = MakeButton(inputDialog, 70, "Cancel", 0.5, 0.1, 0.1,
+        function() inputDialog:Hide() end)
     cancel:SetPoint("BOTTOMRIGHT", -8, 8)
 end
 
-local function ShowAcDialog(title, callback)
-    BuildAcDialog()
-    acDialog.title:SetText(title)
-    acSuppressAC = true; acDialog.eb:SetText(""); acSuppressAC = false
-    HideAC()
-    acCallback = callback
+local function ShowInputDialog(title, callback)
+    BuildInputDialog()
+    inputDialog.title:SetText(title)
+    suppressAutocomplete = true; inputDialog.editBox:SetText(""); suppressAutocomplete = false
+    HideAutocomplete()
+    autocompleteCallback = callback
     C_GuildInfo.GuildRoster()
-    acDialog:Show()
-    acDialog.eb:SetFocus()
+    inputDialog:Show()
+    inputDialog.editBox:SetFocus()
 end
 
 -- ── Member info lookup ─────────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ local function GetOrCreateLinkedRow(i)
     local hl = row:CreateTexture(nil, "BACKGROUND")
     hl:SetAllPoints(); hl:SetColorTexture(0.25, 0.2, 0.05, 0); row.hl = hl
 
-    row.nameLabel = MakeFS(row, 11)
+    row.nameLabel = MakeLabel(row, 11)
     row.nameLabel:SetPoint("LEFT", PAD, 0)
     row.nameLabel:SetPoint("RIGHT", -70, 0)
     row.nameLabel:SetJustifyH("LEFT")
@@ -240,10 +240,10 @@ local function GetOrCreateLinkedRow(i)
     row.setMainBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
     row.setMainBtn:SetSize(62, 16)
     row.setMainBtn:SetPoint("RIGHT", -PAD, 0)
-    StyleBtn(row.setMainBtn, 0.50, 0.40, 0.09)
-    local smL = MakeFS(row.setMainBtn, 9, 0.9, 0.76, 0.22)
-    smL:SetAllPoints(); smL:SetJustifyH("CENTER"); smL:SetText("Set Main")
-    row.setMainBtn.lbl = smL
+    StyleButton(row.setMainBtn, 0.50, 0.40, 0.09)
+    local lbl = MakeLabel(row.setMainBtn, 9, 0.9, 0.76, 0.22)
+    lbl:SetAllPoints(); lbl:SetJustifyH("CENTER"); lbl:SetText("Set Main")
+    row.setMainBtn.lbl = lbl
     -- OnClick set at populate time via row.charName
     row.setMainBtn:SetScript("OnClick", function()
         if not row.charName then return end
@@ -281,7 +281,7 @@ local function BuildPopup()
     accent:SetColorTexture(0.75, 0.60, 0.12, 1)
 
     -- Name header
-    popup.nameLabel = MakeFS(popup, 12, 1, 1, 1)
+    popup.nameLabel = MakeLabel(popup, 12, 1, 1, 1)
     popup.nameLabel:SetPoint("TOPLEFT", PAD, -6)
     popup.nameLabel:SetPoint("TOPRIGHT", -22, -6)
     popup.nameLabel:SetJustifyH("LEFT")
@@ -290,7 +290,7 @@ local function BuildPopup()
     local closeBtn = CreateFrame("Button", nil, popup)
     closeBtn:SetSize(16, 16)
     closeBtn:SetPoint("TOPRIGHT", -3, -3)
-    local closeLabel = MakeFS(closeBtn, 11, 0.5, 0.5, 0.5)
+    local closeLabel = MakeLabel(closeBtn, 11, 0.5, 0.5, 0.5)
     closeLabel:SetAllPoints(); closeLabel:SetJustifyH("CENTER")
     closeLabel:SetText("x")
     closeBtn:SetScript("OnEnter", function() closeLabel:SetTextColor(1, 0.3, 0.3, 1) end)
@@ -298,7 +298,7 @@ local function BuildPopup()
     closeBtn:SetScript("OnClick", function() popup:Hide(); currentName = nil end)
 
     -- Status line (Main / Alt of X / Not linked)
-    popup.statusLabel = MakeFS(popup, 10, 0.6, 0.6, 0.6)
+    popup.statusLabel = MakeLabel(popup, 10, 0.6, 0.6, 0.6)
     popup.statusLabel:SetPoint("TOPLEFT", PAD, -22)
 
     -- Section separator
@@ -309,7 +309,7 @@ local function BuildPopup()
     popup.sep1:SetColorTexture(0.30, 0.24, 0.06, 0.5)
 
     -- "Linked Characters" section label
-    popup.sectionLabel = MakeFS(popup, 9, 0.50, 0.42, 0.12)
+    popup.sectionLabel = MakeLabel(popup, 9, 0.50, 0.42, 0.12)
     popup.sectionLabel:SetPoint("TOPLEFT", PAD, -40)
 
     -- Scrollable rows area (height set at populate time)
@@ -356,8 +356,8 @@ local function BuildPopup()
     rowsScroll:HookScript("OnScrollRangeChanged", UpdateScrollbar)
 
     -- Bottom button area (height and position set at populate time)
-    popup.btn1 = MakeBtn(popup, 90, "", 0.50, 0.40, 0.09)
-    popup.btn2 = MakeBtn(popup, 90, "", 0.55, 0.15, 0.15)
+    popup.btn1 = MakeButton(popup, 90, "", 0.50, 0.40, 0.09)
+    popup.btn2 = MakeButton(popup, 90, "", 0.55, 0.15, 0.15)
 end
 
 -- ── Populate popup for a given member ─────────────────────────────────────────
@@ -404,10 +404,10 @@ ShowForMember = function(memberName)
 
         popup.btn2:SetPoint("TOPRIGHT", -PAD, rowsY - 4)
         popup.btn2.lbl:SetText("Link as Alt...")
-        StyleBtn(popup.btn2, 0.50, 0.40, 0.09)
+        StyleButton(popup.btn2, 0.50, 0.40, 0.09)
         popup.btn2:Show()
         popup.btn2:SetScript("OnClick", function()
-            ShowAcDialog("Link " .. memberName .. " as alt of:", function(mainName)
+            ShowInputDialog("Link " .. memberName .. " as alt of:", function(mainName)
                 addon.MI_Guild_LinkAltToMain(memberName, mainName)
                 if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
                 ShowForMember(memberName)
@@ -431,25 +431,23 @@ ShowForMember = function(memberName)
         local members = { group.main }
         for _, a in ipairs(group.alts) do table.insert(members, a) end
 
-        local rowIdx = 0
         local yOff = 0
-        for _, name in ipairs(members) do
-            rowIdx = rowIdx + 1
-            local row = GetOrCreateLinkedRow(rowIdx)
+        for i, name in ipairs(members) do
+            local row = GetOrCreateLinkedRow(i)
             row:SetPoint("TOPLEFT", rowsChild, "TOPLEFT", 0, -yOff)
             row:SetWidth(rowsChild:GetWidth())
             row.charName = name
             local isCurrentMember = (name == memberName)
-            local isMn = (name == group.main)
+            local isThisMain = (name == group.main)
 
-            if isMn then
+            if isThisMain then
                 row.nameLabel:SetText("|cffffcc00" .. name .. "|r")
             else
                 row.nameLabel:SetText(name)
             end
             row.hl:SetColorTexture(0.25, 0.2, 0.05, isCurrentMember and 0.18 or 0)
 
-            if isMn then
+            if isThisMain then
                 row.setMainBtn:Hide()
             else
                 row.setMainBtn:Show()
@@ -466,10 +464,10 @@ ShowForMember = function(memberName)
         local btnY = -(46 + visH + 6)
         popup.btn1:SetPoint("TOPLEFT", PAD, btnY)
         popup.btn1.lbl:SetText("Link Alt...")
-        StyleBtn(popup.btn1, 0.50, 0.40, 0.09)
+        StyleButton(popup.btn1, 0.50, 0.40, 0.09)
         popup.btn1:Show()
         popup.btn1:SetScript("OnClick", function()
-            ShowAcDialog("Add alt to " .. group.main .. ":", function(altName)
+            ShowInputDialog("Add alt to " .. group.main .. ":", function(altName)
                 addon.MI_Guild_LinkAltToMain(altName, group.main)
                 if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
                 ShowForMember(memberName)
@@ -479,7 +477,7 @@ ShowForMember = function(memberName)
         popup.btn2:SetPoint("TOPRIGHT", -PAD, btnY)
         if isMain then
             popup.btn2.lbl:SetText("Delete Group")
-            StyleBtn(popup.btn2, 0.55, 0.1, 0.1)
+            StyleButton(popup.btn2, 0.55, 0.1, 0.1)
             popup.btn2:SetScript("OnClick", function()
                 addon.MI_Guild_DeleteGroup(idx)
                 if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
@@ -487,7 +485,7 @@ ShowForMember = function(memberName)
             end)
         else
             popup.btn2.lbl:SetText("Unlink Me")
-            StyleBtn(popup.btn2, 0.55, 0.1, 0.1)
+            StyleButton(popup.btn2, 0.55, 0.1, 0.1)
             popup.btn2:SetScript("OnClick", function()
                 addon.MI_Guild_UnlinkChar(memberName)
                 if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
@@ -570,8 +568,8 @@ local function TryHook()
     local gmBtn = CreateFrame("Button", "MysteriousQoL_GuildMgrBtn", CommunitiesFrame, "BackdropTemplate")
     gmBtn:SetSize(110, 20)
     gmBtn:SetPoint("BOTTOMLEFT", CommunitiesFrame, "BOTTOMLEFT", 8, 8)
-    StyleBtn(gmBtn, 0.50, 0.40, 0.09)
-    local gmLbl = MakeFS(gmBtn, 10, 0.9, 0.76, 0.22)
+    StyleButton(gmBtn, 0.50, 0.40, 0.09)
+    local gmLbl = MakeLabel(gmBtn, 10, 0.9, 0.76, 0.22)
     gmLbl:SetAllPoints(); gmLbl:SetJustifyH("CENTER"); gmLbl:SetText("Guild Manager")
     gmBtn:SetScript("OnClick", function()
         if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end

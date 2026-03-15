@@ -102,7 +102,7 @@ local function GetChatMessages(chatFrame)
     local lines = {}
     local numMessages = chatFrame:GetNumMessages()
 
-    if numMessages and numMessages > 0 then
+    if numMessages > 0 then
         for i = 1, numMessages do
             local msg = chatFrame:GetMessageInfo(i)
             if msg and msg ~= "" then
@@ -136,7 +136,6 @@ end
 local function OpenCopyWindow(chatFrame)
     BuildCopyFrame()
     local text = GetChatMessages(chatFrame)
-    copyEdit:SetTextColor(1, 1, 1, 1)
     copyEdit:SetText(text)
     copyFrame:Show()
     copyEdit:SetFocus()
@@ -198,9 +197,9 @@ end
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", function()
+    if chatButtons[1] then return end  -- already created; don't stack duplicates on zone change
     if not addon.db.ui_chatCopy_enabled then return end
 
-    -- Add copy button to each chat tab
     for i = 1, NUM_CHAT_WINDOWS do
         local chatFrame = _G["ChatFrame" .. i]
         if chatFrame then
