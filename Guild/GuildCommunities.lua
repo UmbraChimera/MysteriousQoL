@@ -18,8 +18,6 @@ local ShowForMember  -- forward declaration
 
 local MAX_VISIBLE_ROWS = 6
 
--- ── Helpers ───────────────────────────────────────────────────────────────────
-
 local function MakeBackdrop()
     return {
         bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1,
@@ -54,8 +52,6 @@ local function MakeButton(parent, w, label, r, g, b, onClick)
     if onClick then btn:SetScript("OnClick", onClick) end
     return btn
 end
-
--- ── Autocomplete dialog (reused from GuildPanel pattern) ──────────────────────
 
 local inputDialog, autocompleteCallback, autocompleteFrame, autocompleteRows, suppressAutocomplete = nil, nil, nil, {}, false
 local MAX_AUTOCOMPLETE = 8
@@ -201,8 +197,6 @@ local function ShowInputDialog(title, callback)
     inputDialog.editBox:SetFocus()
 end
 
--- ── Member info lookup ─────────────────────────────────────────────────────────
-
 local function GetGuildMemberInfo(charName)
     for i = 1, GetNumGuildMembers() do
         local name, _, _, level, classDisplay, _, _, _, _, _, classToken = GetGuildRosterInfo(i)
@@ -218,8 +212,6 @@ local function ClassColor(classToken)
     if c then return string.format("|cff%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255) end
     return "|cffffffff"
 end
-
--- ── Popup frame ───────────────────────────────────────────────────────────────
 
 local function GetOrCreateLinkedRow(i)
     if linkedRows[i] then return linkedRows[i] end
@@ -314,7 +306,7 @@ local function BuildPopup()
 
     -- Scrollable rows area (height set at populate time)
     rowsScroll = CreateFrame("ScrollFrame", nil, popup)
-    rowsScroll:SetPoint("TOPLEFT", PAD - 2, -46)
+    rowsScroll:SetPoint("TOPLEFT", PAD - 2, -54)
     rowsScroll:SetWidth(POPUP_W - PAD * 2 + 2 - 6)
     rowsScroll:SetHeight(ROW_H)
     rowsScroll:EnableMouseWheel(true)
@@ -360,8 +352,6 @@ local function BuildPopup()
     popup.btn2 = MakeButton(popup, 90, "", 0.55, 0.15, 0.15)
 end
 
--- ── Populate popup for a given member ─────────────────────────────────────────
-
 ShowForMember = function(memberName)
     if not addon.db.guild_alts_enabled then return end
     BuildPopup()
@@ -384,7 +374,7 @@ ShowForMember = function(memberName)
 
     local idx, group, isMain = addon.MI_Guild_GetGroupForChar(memberName)
 
-    local rowsY = -46  -- Y offset from popup top where rows start
+    local rowsY = -54  -- Y offset from popup top where rows start
 
     if not group then
         -- Not linked
@@ -414,7 +404,7 @@ ShowForMember = function(memberName)
             end)
         end)
 
-        popup:SetHeight(86)
+        popup:SetHeight(94)
 
     else
         -- In a group
@@ -461,7 +451,7 @@ ShowForMember = function(memberName)
         rowsScroll:SetHeight(visH)
 
         -- Action buttons anchored below the scroll area
-        local btnY = -(46 + visH + 6)
+        local btnY = -(54 + visH + 6)
         popup.btn1:SetPoint("TOPLEFT", PAD, btnY)
         popup.btn1.lbl:SetText("Link Alt...")
         StyleButton(popup.btn1, 0.50, 0.40, 0.09)
@@ -508,8 +498,6 @@ ShowForMember = function(memberName)
     end
     popup:Show()
 end
-
--- ── Scroll button hooks ────────────────────────────────────────────────────────
 
 local function HookButton(button)
     if button._mqol_hooked then return end
@@ -558,6 +546,13 @@ local function TryHook()
         if popup then popup:Hide() end
         currentName = nil
     end)
+    local detailFrame = CommunitiesFrame.GuildMemberDetailFrame
+    if detailFrame then
+        detailFrame:HookScript("OnHide", function()
+            if popup then popup:Hide() end
+            currentName = nil
+        end)
+    end
     local function onTab() if popup then popup:Hide() end; currentName = nil end
     if CommunitiesFrame.RosterTab        then CommunitiesFrame.RosterTab:HookScript("OnClick", onTab) end
     if CommunitiesFrame.ChatTab          then CommunitiesFrame.ChatTab:HookScript("OnClick", onTab) end

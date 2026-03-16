@@ -1,10 +1,7 @@
 local addonName, addon = ...
 
--- ── Custom Settings UI ─────────────────────────────────────────────────────
 -- Teal-themed settings panel with horizontal top tabs, collapsible sections,
 -- and parent-child checkbox gating (what the native API can't do).
-
--- ── Color palette ──────────────────────────────────────────────────────────
 
 local C = {
     teal        = { 0.00, 0.80, 0.80, 1.0 },  -- #00cccc
@@ -35,8 +32,6 @@ local FRAME_HEIGHT    = 500
 local TAB_HEIGHT      = 28
 local HEADER_HEIGHT   = 30  -- title row
 
--- ── State ──────────────────────────────────────────────────────────────────
-
 local mainFrame, tabBar, contentFrame, scrollFrame, scrollChild
 local activeTab = nil
 local tabButtons = {}
@@ -45,8 +40,6 @@ local allWidgets = {}        -- flat list of all widget entries for current tab
 local tabCache = {}          -- { name = { widgets = {}, children = {} } } -built tabs are cached and reused
 
 addon.customUI = {}
-
--- ── Helpers ────────────────────────────────────────────────────────────────
 
 -- Pre-allocated backdrop tables (reused by every MakeBackdrop call to avoid per-call allocations)
 local backdrop1 = { bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1, insets = { left = 1, right = 1, top = 1, bottom = 1 } }
@@ -68,8 +61,6 @@ local function MakeBackdrop(frame, bgColor, borderColor, edgeSize)
         frame:SetBackdropBorderColor(unpack(borderColor))
     end
 end
-
--- ── Layout engine ──────────────────────────────────────────────────────────
 
 local function RecalcLayout()
     if not scrollChild then return end
@@ -102,7 +93,7 @@ local function UpdateChildVisibility(parentKey, checked)
     RecalcLayout()
 end
 
--- ── Widget: Section Header ─────────────────────────────────────────────────
+-- Widget: Section Header
 
 function addon.customUI.Header(title)
     if #allWidgets > 0 then
@@ -127,7 +118,7 @@ function addon.customUI.Header(title)
     table.insert(allWidgets, { frame = frame, height = 24 })
 end
 
--- ── Widget: Button ─────────────────────────────────────────────────────────
+-- Widget: Button
 
 function addon.customUI.Button(label, onClick)
     local frame = CreateFrame("Frame", nil, scrollChild)
@@ -160,7 +151,7 @@ function addon.customUI.Button(label, onClick)
     table.insert(allWidgets, { frame = frame, height = WIDGET_HEIGHT })
 end
 
--- ── Widget: Checkbox ───────────────────────────────────────────────────────
+-- Widget: Checkbox
 
 function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
     local frame = CreateFrame("Frame", nil, scrollChild)
@@ -253,7 +244,7 @@ function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
     Refresh()
 end
 
--- ── Widget: Dropdown ───────────────────────────────────────────────────────
+-- Widget: Dropdown
 
 function addon.customUI.Dropdown(key, label, options, tooltip, onChange)
     local frame = CreateFrame("Frame", nil, scrollChild)
@@ -361,7 +352,7 @@ function addon.customUI.Dropdown(key, label, options, tooltip, onChange)
     Refresh()
 end
 
--- ── Widget: Slider ─────────────────────────────────────────────────────────
+-- Widget: Slider
 
 function addon.customUI.Slider(key, label, minVal, maxVal, step, tooltip, onChange)
     local frame = CreateFrame("Frame", nil, scrollChild)
@@ -455,13 +446,9 @@ function addon.customUI.Slider(key, label, minVal, maxVal, step, tooltip, onChan
     table.insert(allWidgets, { frame = frame, height = WIDGET_HEIGHT + 8, key = key, refresh = Refresh })
 end
 
--- ── Category registration ──────────────────────────────────────────────────
-
 function addon.customUI.RegisterCategory(name, buildFunc)
     categoryBuilders[name] = buildFunc
 end
-
--- ── Build horizontal tab button ──────────────────────────────────────────
 
 local function CreateTabButton(parent, name, index, totalTabs)
     local tabWidth = (FRAME_WIDTH - 2) / totalTabs
@@ -512,8 +499,6 @@ local function CreateTabButton(parent, name, index, totalTabs)
     return btn
 end
 
--- ── Open a tab ─────────────────────────────────────────────────────────────
-
 function addon.customUI.OpenTab(name)
     if not categoryBuilders[name] then return end
 
@@ -560,8 +545,6 @@ function addon.customUI.OpenTab(name)
     scrollFrame:SetVerticalScroll(0)
 end
 
--- ── Build main frame ───────────────────────────────────────────────────────
-
 local function BuildMainFrame()
     mainFrame = CreateFrame("Frame", "MysteriousQoL_SettingsFrame", UIParent, "BackdropTemplate")
     mainFrame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
@@ -588,7 +571,7 @@ local function BuildMainFrame()
     accent:SetPoint("TOPRIGHT", -1, -1)
     accent:SetColorTexture(unpack(C.teal))
 
-    -- ── Header row: title (centered) + version (top-left, faded) + close ─
+    -- Header: title + version + close button
 
     local title = mainFrame:CreateFontString(nil, "OVERLAY")
     title:SetFont(FONT, 15, "OUTLINE")
@@ -606,8 +589,6 @@ local function BuildMainFrame()
     close:SetFrameLevel(mainFrame:GetFrameLevel() + 1)
     close:SetScript("OnClick", function() mainFrame:Hide() end)
 
-    -- ── Tab bar ──────────────────────────────────────────────────────────
-
     tabBar = CreateFrame("Frame", nil, mainFrame)
     tabBar:SetHeight(TAB_HEIGHT)
     tabBar:SetPoint("TOPLEFT", 1, -(HEADER_HEIGHT + 3))
@@ -619,8 +600,6 @@ local function BuildMainFrame()
     tabDivider:SetPoint("BOTTOMLEFT", 0, 0)
     tabDivider:SetPoint("BOTTOMRIGHT", 0, 0)
     tabDivider:SetColorTexture(unpack(C.tealDim))
-
-    -- ── Content area ─────────────────────────────────────────────────────
 
     local contentTop = HEADER_HEIGHT + TAB_HEIGHT + 4
 
@@ -639,8 +618,6 @@ local function BuildMainFrame()
     scrollChild:SetWidth(FRAME_WIDTH - SCROLLBAR_WIDTH - 6)
     scrollChild:SetHeight(1)
     scrollFrame:SetScrollChild(scrollChild)
-
-    -- ── Scrollbar ────────────────────────────────────────────────────────
 
     local scrollTrack = CreateFrame("Frame", nil, contentFrame)
     scrollTrack:SetWidth(SCROLLBAR_WIDTH)
@@ -773,8 +750,6 @@ local function BuildMainFrame()
     end)
 end
 
--- ── Init ─────────────────────────────────────────────────────────────────
-
 function addon.MI_SettingsUI_Init()
     BuildMainFrame()
 end
@@ -799,8 +774,6 @@ function addon.MI_SettingsUI_BuildTabs()
         addon.customUI.OpenTab(validTabs[1])
     end
 end
-
--- ── Toggle ─────────────────────────────────────────────────────────────────
 
 function addon.customUI.Toggle()
     if not mainFrame then return end

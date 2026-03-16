@@ -25,7 +25,7 @@ eventFrame:RegisterEvent("PLAYER_ALIVE")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_DEAD" then
         local _, instanceType, difficultyID = GetInstanceInfo()
-        local isLFR = select(8, GetDifficultyInfo(difficultyID))
+        local _, _, _, _, _, _, isLFR = GetDifficultyInfo(difficultyID)
         if IsInRaid() and instanceType == "raid" and not isLFR then
             diedInRaid = true
         end

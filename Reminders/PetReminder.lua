@@ -10,8 +10,6 @@ local HUNTER_NO_PET_TALENTS = { 466846, 1232995, 1223323 }
 local GRIMOIRE_OF_SACRIFICE      = 108503
 local GRIMOIRE_SACRIFICE_BUFF    = 196099
 
--- ── Suppression helper ─────────────────────────────────────────────────────
-
 local function isSuppressed()
     return UnitIsDeadOrGhost("player")
         or IsMounted()
@@ -19,8 +17,6 @@ local function isSuppressed()
         or UnitHasVehicleUI("player")
         or UnitOnTaxi("player")
 end
-
--- ── Pet check helpers ──────────────────────────────────────────────────────
 
 local function isPetExpected()
     if addon.playerClass == "WARLOCK" then
@@ -69,8 +65,6 @@ local function getPetMessage()
     return nil
 end
 
--- ── Display frame ────────────────────────────────────────────────────────
-
 local petFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_PetReminderFrame", {
     baseY    = 155,
     bounce   = 6,
@@ -79,8 +73,6 @@ local petFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_PetReminderFrame
     color    = { 1, 0.2, 0.2, 1 },
     icon     = 132161,
 })
-
--- ── Update ─────────────────────────────────────────────────────────────────
 
 function addon.MI_PetReminder_Update()
     local petMsg = getPetMessage()

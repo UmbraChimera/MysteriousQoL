@@ -6,8 +6,6 @@ local _, addon = ...
 --   * Pet idle in combat (same classes)
 --   * Don't release in a raid instance
 
--- ── Update logic ───────────────────────────────────────────────────────────────
-
 local function updateReminders()
     addon.MI_BuffReminder_Update()
     addon.MI_PetReminder_Update()
@@ -34,8 +32,6 @@ local function updateRemindersThrottled()
         end)
     end
 end
-
--- ── Event handling ─────────────────────────────────────────────────────────────
 
 local eventFrame = CreateFrame("Frame")
 local eventsRegistered = false
@@ -83,8 +79,6 @@ local function AnyReminderEnabled()
         or db.combat_deathReleaseProtection
         or db.combat_repairReminder_enabled
 end
-
--- ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 function addon.MI_Reminders_Init()
     local _, class = UnitClass("player")

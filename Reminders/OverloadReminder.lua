@@ -17,8 +17,6 @@ local function isOffCooldown(spellID)
     return info and info.startTime == 0
 end
 
--- ── Display frame ─────────────────────────────────────────────────────────────
-
 local overloadFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_OverloadReminderFrame", {
     baseY    = 80,
     bounce   = 6,
@@ -28,8 +26,6 @@ local overloadFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_OverloadRem
     strata   = "HIGH",
     text     = "USE OVERLOAD!",
 })
-
--- ── Event handling ─────────────────────────────────────────────────────────────
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")

@@ -9,8 +9,6 @@ local channelOpts = {
     { text = "Dialog",        value = "Dialog" },
 }
 
--- ── Initialization ──────────────────────────────────────────────────────────
-
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(self, event, name)
@@ -21,10 +19,6 @@ frame:SetScript("OnEvent", function(self, event, name)
 
     -- Build custom settings frame
     addon.MI_SettingsUI_Init()
-
-    -- ── Register categories ────────────────────────────────────────────────
-
-    -- ─── GENERAL ───────────────────────────────────────────────────────────
 
     UI.RegisterCategory("General", function()
         UI.Header("Automation")
@@ -72,8 +66,6 @@ frame:SetScript("OnEvent", function(self, event, name)
         UI.Checkbox("vendor_autoSell", "Auto Sell Greys",
             "Automatically sells all grey (poor quality) items when visiting a merchant. Hold Shift to skip.")
     end)
-
-    -- ─── UI ────────────────────────────────────────────────────────────────
 
     UI.RegisterCategory("UI", function()
         UI.Header("Chat")
@@ -138,8 +130,6 @@ frame:SetScript("OnEvent", function(self, event, name)
             })
     end)
 
-    -- ─── REMINDERS ─────────────────────────────────────────────────────────
-
     UI.RegisterCategory("Reminders", function()
         UI.Header("Class Buff")
         local function refreshReminders()
@@ -180,8 +170,6 @@ frame:SetScript("OnEvent", function(self, event, name)
             "Shows a center-screen warning when any equipped gear drops to 50% durability (yellow).",
             refreshReminders)
     end)
-
-    -- ─── FUN ───────────────────────────────────────────────────────────────
 
     UI.RegisterCategory("Fun", function()
         UI.Header("Batman")
@@ -274,8 +262,6 @@ frame:SetScript("OnEvent", function(self, event, name)
             })
     end)
 
-    -- ─── GUILD ─────────────────────────────────────────────────────────────
-
     UI.RegisterCategory("Guild", function()
         UI.Header("Alt Tracking")
         UI.Checkbox("guild_alts_enabled", "Enable Guild Module",
@@ -287,6 +273,11 @@ frame:SetScript("OnEvent", function(self, event, name)
         UI.Checkbox("guild_sync_enabled", "Sync Alt Data With Guildmates",
             "Broadcasts your alt group data to guild members who also have MysteriousQoL installed. Auto-syncs 30 seconds after login. Trusted rank is set via ^#MQoL:N#^ in Guild Info (default: rank 1 and above).")
 
+
+        UI.Header("Inactivity")
+        UI.Slider("guild_inactive_days", "Inactivity Threshold (days)",
+            7, 365, 7,
+            "Members not seen within this many days are flagged as inactive in the Guild Manager.")
 
         UI.Header("Log")
         UI.Checkbox("guild_log_enabled", "Activity Log",
@@ -321,12 +312,17 @@ frame:SetScript("OnEvent", function(self, event, name)
     end
 end)
 
--- ── Slash command ────────────────────────────────────────────────────────────
+-- Slash command
 
 SLASH_MYSTERIOUSQOL1 = "/mqol"
 SlashCmdList["MYSTERIOUSQOL"] = function(msg)
-    if msg and msg:lower() == "guild" then
+    local cmd = msg and msg:lower() or ""
+    if cmd == "guild" then
         if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end
+        return
+    end
+    if cmd == "syncdebug" then
+        if addon.MI_GuildSync_ToggleDebug then addon.MI_GuildSync_ToggleDebug() end
         return
     end
     if addon.customUI and addon.customUI.Toggle then

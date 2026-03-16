@@ -14,9 +14,7 @@ local function SlotKeystone()
                 -- classID 16 = Reagent (was 106 pre-DF), subClassID 13 = Keystone
                 if classID == 16 and subClassID == 13 then
                     C_Container.PickupContainerItem(bag, slot)
-                    if C_ChallengeMode.SlotKeystone then
-                        C_ChallengeMode.SlotKeystone()
-                    end
+                    C_ChallengeMode.SlotKeystone()
                     return
                 end
             end

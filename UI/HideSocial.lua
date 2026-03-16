@@ -2,8 +2,6 @@ local _, addon = ...
 
 -- Hides various UI clutter elements.
 
--- ── Hide Social Button ──────────────────────────────────────────────────────
-
 local function applySocialVisibility()
     if not QuickJoinToastButton then return end
     if addon.db.ui_hideSocial_enabled then
@@ -14,8 +12,6 @@ local function applySocialVisibility()
         QuickJoinToastButton:EnableMouse(true)
     end
 end
-
--- ── Hide Alerts ─────────────────────────────────────────────────────────────
 
 local alertsHooked = false
 local function hookAlerts()
@@ -30,8 +26,6 @@ local function hookAlerts()
     end)
 end
 
--- ── Hide Talking Head ───────────────────────────────────────────────────────
-
 local talkingHeadHooked = false
 local function hookTalkingHead()
     if talkingHeadHooked then return end
@@ -44,8 +38,6 @@ local function hookTalkingHead()
         end
     end)
 end
-
--- ── Hide Event Toasts ───────────────────────────────────────────────────────
 
 local toastsHooked = false
 local function hookEventToasts()
@@ -63,8 +55,6 @@ local function hookEventToasts()
         end
     end)
 end
-
--- ── Hide Zone Text ──────────────────────────────────────────────────────────
 
 local zoneTextHooked = false
 local function hookZoneText()
@@ -101,8 +91,6 @@ local function applyZoneTextVisibility()
         if SubZoneTextFrame then SubZoneTextFrame:Hide() end
     end
 end
-
--- ── Event Handling ──────────────────────────────────────────────────────────
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")

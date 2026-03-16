@@ -2,15 +2,11 @@ local _, addon = ...
 
 local StripHyperlinks = StripHyperlinks or (C_StringUtil and C_StringUtil.StripHyperlinks)
 
--- ── Constants ────────────────────────────────────────────────────────────────
-
 local BUTTON_SIZE   = 18
 local COPY_WIDTH    = 600
 local COPY_HEIGHT   = 400
 local BAR_TEX       = [[Interface\Buttons\WHITE8x8]]
 local FONT          = "Fonts\\FRIZQT__.TTF"
-
--- ── Copy window ──────────────────────────────────────────────────────────────
 
 local copyFrame, copyEdit, copyScroll
 
@@ -82,8 +78,6 @@ local function BuildCopyFrame()
     copyScroll:SetScrollChild(copyEdit)
 end
 
--- ── Extract chat messages ────────────────────────────────────────────────────
-
 local function CleanText(text)
     text = text:gsub("|K.-|k", "???")       -- encrypted/secret values
     if StripHyperlinks then
@@ -146,8 +140,6 @@ local function OpenCopyWindow(chatFrame)
     end)
 end
 
--- ── Chat frame buttons ───────────────────────────────────────────────────────
-
 local chatButtons = {}
 
 local function CreateCopyButton(chatFrame, index)
@@ -191,8 +183,6 @@ local function UpdateButtonVisibility()
         btn:SetShown(show)
     end
 end
-
--- ── Init ─────────────────────────────────────────────────────────────────────
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")

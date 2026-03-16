@@ -15,9 +15,7 @@ f:SetScript("OnEvent", function()
         local filters = searchBar.FilterButton.filters
         if filters then
             filters[Enum.AuctionHouseFilter.CurrentExpansionOnly] = true
-            if searchBar.FilterButton.UpdateClearFiltersButton then
-                searchBar.FilterButton:UpdateClearFiltersButton()
-            end
+            searchBar.FilterButton:UpdateClearFiltersButton()
         end
     end)
 end)

@@ -3,50 +3,64 @@ local _, addon = ...
 local FONT    = "Fonts\\FRIZQT__.TTF"
 local BAR_TEX = [[Interface\Buttons\WHITE8x8]]
 
--- Panel and layout sizes
-local PW, PH   = 680, 540  -- panel width, height
-local LEFT_W   = 292        -- roster pane width
-local ROW_H    = 18         -- height of each roster / linked row
-local DETAIL_H = 200        -- fixed height of the character-detail block
+local PW, PH   = 680, 540
+local LEFT_W   = 292
+local ROW_H    = 18
+local DETAIL_H = 244
 
--- Theme colors: gold for primary actions, red for destructive ones.
--- Defined once here so they're easy to find and change.
-local GOLD_R, GOLD_G, GOLD_B     = 0.90, 0.76, 0.22  -- gold label text
-local GOLD_BR, GOLD_BG, GOLD_BB  = 0.50, 0.40, 0.09  -- gold button border (darker)
-local RED_BR,  RED_BG,  RED_BB   = 0.55, 0.10, 0.10  -- red button border (destructive)
-local RED_R,   RED_G,   RED_B    = 1.00, 0.40, 0.40  -- red button label text
+local GOLD_R, GOLD_G, GOLD_B    = 0.90, 0.76, 0.22
+local GOLD_BR, GOLD_BG, GOLD_BB = 0.50, 0.40, 0.09
+local RED_BR,  RED_BG,  RED_BB  = 0.55, 0.10, 0.10
+local RED_R,   RED_G,   RED_B   = 1.00, 0.40, 0.40
 
 local panelFrame = nil
 
--- Left pane: guild roster
 local rosterScroll, rosterChild
-local rosterRows    = {}   -- pooled row frames
-local rosterEntries = {}   -- current displayed data
+local rosterRows    = {}
+local rosterEntries = {}
 local selectedName  = nil
 local filterBox     = nil
 
--- Right pane top: selected-character detail
-local detailNameLabel, detailStatusLabel, detailNoteLabel, detailJoinLabel
+local detailNameLabel, detailStatusLabel, detailNoteLabel
+local detailLastSeenLabel, detailJoinLabel, detailJoinEditBtn
+local detailInactiveLabel
+local detailRoleTankCB, detailRoleHealCB, detailRoleDpsCB
 local linkedScroll, linkedChild
-local linkedRows = {}      -- pooled rows for linked-character list
+local linkedRows = {}
 local detailActionBtn, detailDestructBtn
 local detailNickLabel, detailNickBtn
+local detailRolesHdr
 
--- Right pane bottom: activity log
 local logEdit
 
--- Filter state
-local rosterFilter  = "all"  -- "all", "mains", "alts", "unlinked"
-local onlineOnly    = false
+local rosterFilter = "all"
+local onlineOnly   = false
 local radioAll, radioMains, radioAlts, radioUnlinked, onlineOnlyBtn
-local statsLabel    = nil
+local statsLabel   = nil
 
--- ── Helpers ───────────────────────────────────────────────────────────────────
+local syncPopup     = nil
+local syncPopupRows = {}
+local syncPopupNoPeers   = nil
+local syncPopupLeaderLbl = nil
+local syncPopupAllBtn    = nil
+
+local collapsedMains = {}
+local sortKey = "name"
+local sortAsc = true
+local sortBtns = {}
+
+-- ---------------------------------------------------------------------------------
 
 local function ClassColor(classToken)
     local c = RAID_CLASS_COLORS and classToken and RAID_CLASS_COLORS[classToken]
     if c then return string.format("|cff%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255) end
     return "|cffffffff"
+end
+
+local function ClassColorRGB(classToken)
+    local c = RAID_CLASS_COLORS and classToken and RAID_CLASS_COLORS[classToken]
+    if c then return c.r, c.g, c.b end
+    return 0.65, 0.65, 0.65
 end
 
 local function GetMemberInfo(charName)
@@ -60,25 +74,19 @@ local function GetMemberInfo(charName)
 end
 
 local function BuildStatsText()
-    local numTotal, _, numAccounts = GetNumGuildMembers()
-    numTotal = numTotal or 0
-    local groups = addon.MI_Guild_GetAllGroups()
+    local numTotal = GetNumGuildMembers() or 0
+    local groups   = addon.MI_Guild_GetAllGroups()
     local numMains = #groups
-    local numAlts = 0
-    for _, group in ipairs(groups) do numAlts = numAlts + #group.alts end
-    local s = "|cff777777Members:|r " .. numTotal
-    if numAccounts and numAccounts > 0 then
-        s = s .. "   |cff777777Accounts:|r " .. numAccounts
-    end
-    s = s .. "   |cff777777Tracked Mains:|r " .. numMains .. "   |cff777777Tracked Alts:|r " .. numAlts
-    return s
+    local numAlts  = 0
+    for _, g in ipairs(groups) do numAlts = numAlts + #g.alts end
+    return "|cff777777Members:|r " .. numTotal
+        .. "   |cff777777Tracked Mains:|r " .. numMains
+        .. "   |cff777777Tracked Alts:|r " .. numAlts
 end
 
 local function MakeBackdrop()
-    return {
-        bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    }
+    return { bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1,
+             insets = { left = 1, right = 1, top = 1, bottom = 1 } }
 end
 
 local function StyleButton(btn, r, g, b)
@@ -89,7 +97,6 @@ local function StyleButton(btn, r, g, b)
     btn:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(r, g, b, 0.7) end)
 end
 
--- Shortcuts for the two button styles used throughout this panel
 local function StyleGoldButton(btn) StyleButton(btn, GOLD_BR, GOLD_BG, GOLD_BB) end
 local function StyleRedButton(btn)  StyleButton(btn, RED_BR,  RED_BG,  RED_BB)  end
 
@@ -100,45 +107,124 @@ local function MakeLabel(parent, font, size, r, g, b)
     return fs
 end
 
--- Creates a thin custom scrollbar that tracks a scroll frame.
--- scrollChild is the inner content frame; thumbMinH is the minimum thumb height in pixels.
+local function FormatDate(ts)
+    if not ts or ts == false then return "Unknown" end
+    return date("%b %d, %Y", ts)
+end
+
+local function FormatDaysAgo(ts)
+    if not ts then return nil end
+    local days = math.floor((time() - ts) / 86400)
+    if days == 0 then return "Today"
+    elseif days == 1 then return "1 day ago"
+    else return days .. " days ago" end
+end
+
+local function IsInactive(lastSeen)
+    if not lastSeen then return false end
+    return (time() - lastSeen) > ((addon.db.guild_inactive_days or 30) * 86400)
+end
+
+local function GetCharData(charName)
+    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return nil end
+    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not data or not data.chars then return nil end
+    return data.chars[charName]
+end
+
+local function GetOldestJoinDate(charNames)
+    if not addon.MI_Guild_guildName then return nil end
+    local data = MysteriousQoLDB.guildData and MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not data or not data.chars then return nil end
+    local oldest = nil
+    for _, charName in ipairs(charNames) do
+        local c = data.chars[charName]
+        if c and c.joinDate and c.joinDate ~= false then
+            if not oldest or c.joinDate < oldest then oldest = c.joinDate end
+        end
+    end
+    return oldest
+end
+
+local function ParseDateInput(s)
+    if not s then return nil end
+    s = s:match("^%s*(.-)%s*$")
+    if s == "" or s:lower() == "unknown" then return false end
+    local y, m, d = s:match("^(%d%d%d%d)-(%d%d?)-(%d%d?)$")
+    if y then return time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 }) end
+    m, d, y = s:match("^(%d%d?)/(%d%d?)/(%d%d%d%d)$")
+    if m then return time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 }) end
+    local n = tonumber(s)
+    if n and n > 0 then return n end
+    return nil
+end
+
+-- ---------------------------------------------------------------------------------
+-- Custom scrollbar (draggable thumb)
+
 local function MakeScrollbar(scrollFrame, scrollChild, thumbMinH)
     thumbMinH = thumbMinH or 16
     local track = CreateFrame("Frame", nil, scrollFrame:GetParent())
     track:SetWidth(5)
     track:SetPoint("TOPLEFT",    scrollFrame, "TOPRIGHT",    1, 0)
     track:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 1, 0)
-
+    track:EnableMouse(true)
     local bg = track:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.12, 0.10, 0.03, 0.35)
-
-    local thumb = track:CreateTexture(nil, "OVERLAY")
-    thumb:SetWidth(4)
-    thumb:SetColorTexture(0.55, 0.44, 0.10, 0.75)
-    thumb:Hide()
-
+    bg:SetAllPoints(); bg:SetColorTexture(0.12, 0.10, 0.03, 0.35)
+    local thumb = CreateFrame("Frame", nil, track)
+    thumb:SetWidth(4); thumb:Hide(); thumb:EnableMouse(true)
+    local thumbTex = thumb:CreateTexture(nil, "OVERLAY")
+    thumbTex:SetAllPoints(); thumbTex:SetColorTexture(0.55, 0.44, 0.10, 0.75)
     local function UpdateThumb()
-        local childH = scrollChild:GetHeight()
-        local viewH  = scrollFrame:GetHeight()
+        local childH = scrollChild:GetHeight(); local viewH = scrollFrame:GetHeight()
         if childH <= viewH then thumb:Hide(); return end
         thumb:Show()
-        local trackH = track:GetHeight()
-        if trackH <= 0 then return end
-        local thumbH    = math.max(thumbMinH, trackH * viewH / childH)
+        local trackH = track:GetHeight(); if trackH <= 0 then return end
+        local thumbH = math.max(thumbMinH, trackH * viewH / childH)
         thumb:SetHeight(thumbH)
-        local maxScroll = scrollFrame:GetVerticalScrollRange()
-        local cur       = scrollFrame:GetVerticalScroll()
-        local ratio     = maxScroll > 0 and (cur / maxScroll) or 0
+        local maxS = scrollFrame:GetVerticalScrollRange()
+        local cur  = scrollFrame:GetVerticalScroll()
+        local ratio = maxS > 0 and (cur / maxS) or 0
         thumb:ClearAllPoints()
         thumb:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -ratio * (trackH - thumbH))
     end
-
-    scrollFrame:HookScript("OnVerticalScroll",    UpdateThumb)
+    local function CursorUIY() return select(2, GetCursorPosition()) / UIParent:GetEffectiveScale() end
+    local dragging, dragStartY, dragStartScroll = false, 0, 0
+    thumb:SetScript("OnMouseDown", function(_, btn)
+        if btn ~= "LeftButton" then return end
+        dragging = true; dragStartY = CursorUIY(); dragStartScroll = scrollFrame:GetVerticalScroll()
+    end)
+    thumb:SetScript("OnMouseUp", function() dragging = false end)
+    thumb:SetScript("OnUpdate", function()
+        if not dragging then return end
+        local tTop = track:GetTop(); local tBot = track:GetBottom()
+        if not tTop or not tBot then return end
+        local trackH_UI = tTop - tBot
+        local thumbH_UI = (thumb:GetTop() and thumb:GetBottom()) and (thumb:GetTop() - thumb:GetBottom()) or 0
+        local range = trackH_UI - thumbH_UI; if range <= 0 then return end
+        local delta = dragStartY - CursorUIY()
+        local maxS  = scrollFrame:GetVerticalScrollRange()
+        scrollFrame:SetVerticalScroll(math.max(0, math.min(maxS, dragStartScroll + (delta / range) * maxS)))
+        UpdateThumb()
+    end)
+    track:SetScript("OnMouseDown", function(_, btn)
+        if btn ~= "LeftButton" then return end
+        local thumbTop = thumb:IsShown() and thumb:GetTop()
+        local cur = scrollFrame:GetVerticalScroll(); local viewH = scrollFrame:GetHeight()
+        local maxS = scrollFrame:GetVerticalScrollRange()
+        if thumbTop and CursorUIY() > thumbTop then
+            scrollFrame:SetVerticalScroll(math.max(0, cur - viewH))
+        else
+            scrollFrame:SetVerticalScroll(math.min(maxS, cur + viewH))
+        end
+        UpdateThumb()
+    end)
+    scrollFrame:HookScript("OnVerticalScroll",     UpdateThumb)
     scrollFrame:HookScript("OnScrollRangeChanged", UpdateThumb)
 end
 
--- ── Input dialog with autocomplete ────────────────────────────────────────────
+-- ---------------------------------------------------------------------------------
+-- Input dialog with autocomplete
 
 local inputDialog, inputCallback
 local inputSkipAutocomplete = false
@@ -159,9 +245,7 @@ local function GetGuildMemberMatches(filter)
     end
     table.sort(results, function(a, b) return a.name < b.name end)
     if #results > MAX_AUTOCOMPLETE then
-        local trimmed = {}
-        for i = 1, MAX_AUTOCOMPLETE do trimmed[i] = results[i] end
-        return trimmed
+        local t = {}; for i = 1, MAX_AUTOCOMPLETE do t[i] = results[i] end; return t
     end
     return results
 end
@@ -297,19 +381,21 @@ local function ShowInputDialog(title, callback, noAC, prefill, allowEmpty)
     inputDialog.editBox:SetFocus()
 end
 
--- ── Roster data helpers ────────────────────────────────────────────────────────
+-- ---------------------------------------------------------------------------------
+-- Roster entries: build + sort
 
 local function BuildRosterEntries(filter)
-    local entries = {}
-    local lowerFilter = filter and filter:lower() or ""
+    local entries  = {}
+    local lowerF   = filter and filter:lower() or ""
     for i = 1, GetNumGuildMembers() do
         local name, rankName, rankIndex, level, _, _, _, _, isOnline, _, classToken = GetGuildRosterInfo(i)
         if name then
-            local groupIdx, group, isMain = addon.MI_Guild_GetGroupForChar(name)
-            local matches = lowerFilter == ""
-                or name:lower():find(lowerFilter, 1, true)
-                or (group and group.main:lower():find(lowerFilter, 1, true))
-                or (group and group.nick and group.nick:lower():find(lowerFilter, 1, true))
+            local mainName, group, isMain = addon.MI_Guild_GetGroupForChar(name)
+            local charData = GetCharData(name)
+            local matches = lowerF == ""
+                or name:lower():find(lowerF, 1, true)
+                or (group and group.main:lower():find(lowerF, 1, true))
+                or (group and group.nick and group.nick:lower():find(lowerF, 1, true))
             if matches
                 and (rosterFilter == "all"
                      or (rosterFilter == "mains"    and group and isMain)
@@ -321,17 +407,33 @@ local function BuildRosterEntries(filter)
                     name       = name,
                     rank       = rankName or "",
                     rankIdx    = rankIndex or 0,
-                    groupIdx   = groupIdx,
+                    mainName   = mainName,
                     group      = group,
                     isMain     = isMain,
                     level      = level or 0,
                     classToken = classToken or "",
+                    isOnline   = isOnline,
+                    lastSeen   = charData and charData.lastSeen,
+                    joinDate   = charData and charData.joinDate,
+                    roles      = charData and charData.roles or "000",
                 })
             end
         end
     end
+
     table.sort(entries, function(a, b)
-        -- Sort so linked characters appear together, mains before their alts
+        if sortKey == "level" then
+            local diff = (b.level or 0) - (a.level or 0)
+            if diff ~= 0 then return sortAsc and diff > 0 or diff < 0 end
+        elseif sortKey == "lastseen" then
+            local at, bt = a.lastSeen or 0, b.lastSeen or 0
+            if at ~= bt then return sortAsc and at > bt or at < bt end
+        elseif sortKey == "joined" then
+            local aj = (a.joinDate and a.joinDate ~= false) and a.joinDate or 0
+            local bj = (b.joinDate and b.joinDate ~= false) and b.joinDate or 0
+            if aj ~= bj then return sortAsc and aj < bj or aj > bj end
+        end
+        -- Group: mains before their alts, then alphabetical within group
         local aKey = a.group and (a.group.main .. "\001" .. (a.isMain and "\000" or a.name)) or a.name
         local bKey = b.group and (b.group.main .. "\001" .. (b.isMain and "\000" or b.name)) or b.name
         return aKey < bKey
@@ -339,22 +441,10 @@ local function BuildRosterEntries(filter)
     return entries
 end
 
-local function StatusText(entry)
-    if entry.isMain then
-        local n = entry.group and #entry.group.alts or 0
-        local alts = n > 0 and (" |cff444444(" .. n .. ")|r") or ""
-        return "|cffffcc00Main|r" .. alts
-    elseif entry.group then
-        return "|cff555555" .. (entry.group.nick or entry.group.main) .. "|r"
-    else
-        return "|cff2a2a2a-|r"
-    end
-end
-
--- ── Right-click context menu ───────────────────────────────────────────────────
+-- ---------------------------------------------------------------------------------
 
 local function ShowRosterContextMenu(charName)
-    local groupIdx, group = addon.MI_Guild_GetGroupForChar(charName)
+    local mainName, group = addon.MI_Guild_GetGroupForChar(charName)
     MenuUtil.CreateContextMenu(UIParent, function(_, rootDescription)
         rootDescription:CreateTitle(charName)
         rootDescription:CreateButton("Set as Main", function()
@@ -362,9 +452,9 @@ local function ShowRosterContextMenu(charName)
             addon.MI_GuildPanel_Refresh()
         end)
         rootDescription:CreateButton("Link as Alt to...", function()
-            ShowInputDialog("Link " .. charName .. " as alt of:", function(mainName)
-                if mainName and mainName ~= "" then
-                    addon.MI_Guild_LinkAltToMain(charName, mainName)
+            ShowInputDialog("Link " .. charName .. " as alt of:", function(main)
+                if main and main ~= "" then
+                    addon.MI_Guild_LinkAltToMain(charName, main)
                     addon.MI_GuildPanel_Refresh()
                 end
             end)
@@ -378,24 +468,64 @@ local function ShowRosterContextMenu(charName)
     end)
 end
 
--- ── Roster row pool ────────────────────────────────────────────────────────────
+-- ---------------------------------------------------------------------------------
+-- Roster rows (pooled)
 
 local function GetOrCreateRosterRow(i)
     if rosterRows[i] then return rosterRows[i] end
+
     local row = CreateFrame("Frame", nil, rosterChild)
     row:SetHeight(ROW_H)
+
+    local colorBar = row:CreateTexture(nil, "ARTWORK")
+    colorBar:SetWidth(3)
+    colorBar:SetPoint("TOPLEFT", 0, 0); colorBar:SetPoint("BOTTOMLEFT", 0, 0)
+    colorBar:SetColorTexture(0.65, 0.65, 0.65, 0.5)
+    row.colorBar = colorBar
 
     local hl = row:CreateTexture(nil, "BACKGROUND")
     hl:SetAllPoints(); hl:SetColorTexture(0.25, 0.2, 0.05, 0); row.hl = hl
 
+    -- Collapse toggle for mains with alts
+    local collapseBtn = CreateFrame("Button", nil, row)
+    collapseBtn:SetSize(13, ROW_H)
+    collapseBtn:SetPoint("LEFT", 4, 0)
+    collapseBtn:Hide()
+    local collapseLbl = collapseBtn:CreateFontString(nil, "OVERLAY")
+    collapseLbl:SetFont(FONT, 9, "")
+    collapseLbl:SetTextColor(0.7, 0.6, 0.3, 1)
+    collapseLbl:SetAllPoints()
+    collapseLbl:SetJustifyH("CENTER")
+    collapseBtn.lbl = collapseLbl
+    row.collapseBtn = collapseBtn
+
     row.nameLabel = MakeLabel(row, FONT, 11)
-    row.nameLabel:SetPoint("LEFT", 6, 0)
-    row.nameLabel:SetWidth(LEFT_W - 108)
+    row.nameLabel:SetPoint("LEFT", 18, 0)
+    row.nameLabel:SetPoint("RIGHT", -76, 0)
     row.nameLabel:SetJustifyH("LEFT")
 
+    -- Role icons: tank, healer, dps
+    local function MakeRoleIcon(xOff)
+        local tex = row:CreateTexture(nil, "ARTWORK")
+        tex:SetSize(12, 12); tex:Hide()
+        tex:SetPoint("RIGHT", row, "RIGHT", xOff, 0)
+        return tex
+    end
+    row.roleIconTank = MakeRoleIcon(-60)
+    row.roleIconHeal = MakeRoleIcon(-46)
+    row.roleIconDps  = MakeRoleIcon(-32)
+
+    -- Inactive indicator
+    row.inactiveMark = MakeLabel(row, FONT, 9, 1, 0.5, 0, 1)
+    row.inactiveMark:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+    row.inactiveMark:SetWidth(14)
+    row.inactiveMark:SetJustifyH("CENTER")
+    row.inactiveMark:Hide()
+
+    -- Status label (M = main, - = unlinked)
     row.statusLabel = MakeLabel(row, FONT, 10)
-    row.statusLabel:SetPoint("RIGHT", -6, 0)
-    row.statusLabel:SetWidth(96)
+    row.statusLabel:SetPoint("RIGHT", -4, 0)
+    row.statusLabel:SetWidth(12)
     row.statusLabel:SetJustifyH("RIGHT")
 
     row:EnableMouse(true)
@@ -411,14 +541,9 @@ local function GetOrCreateRosterRow(i)
     end)
     row:SetScript("OnMouseUp", function(self, btn)
         if not self.entryName then return end
-        if btn == "RightButton" then
-            ShowRosterContextMenu(self.entryName)
-            return
-        end
+        if btn == "RightButton" then ShowRosterContextMenu(self.entryName); return end
         selectedName = self.entryName
-        for _, r in ipairs(rosterRows) do
-            r.hl:SetColorTexture(0, 0, 0, 0)
-        end
+        for _, r in ipairs(rosterRows) do r.hl:SetColorTexture(0, 0, 0, 0) end
         self.hl:SetColorTexture(0.28, 0.22, 0.05, 0.25)
         addon.MI_GuildPanel_UpdateDetail(selectedName)
     end)
@@ -427,7 +552,8 @@ local function GetOrCreateRosterRow(i)
     return row
 end
 
--- ── Linked-character row pool (inside detail pane) ────────────────────────────
+-- ---------------------------------------------------------------------------------
+-- Linked-char rows in detail pane (pooled)
 
 local function GetOrCreateLinkedRow(i)
     if linkedRows[i] then return linkedRows[i] end
@@ -458,93 +584,115 @@ local function GetOrCreateLinkedRow(i)
     return row
 end
 
-local function GetOldestJoinDate(chars)
-    local guildName = addon.MI_Guild_guildName
-    if not guildName then return nil end
-    local data = MysteriousQoLDB.guildData and MysteriousQoLDB.guildData[guildName]
-    if not data or not data.members then return nil end
-    local oldest = nil
-    for _, charName in ipairs(chars) do
-        local m = data.members[charName]
-        if m and m.joinDate and (not oldest or m.joinDate < oldest) then
-            oldest = m.joinDate
-        end
-    end
-    return oldest
-end
-
--- ── Detail pane update ────────────────────────────────────────────────────────
+-- ---------------------------------------------------------------------------------
+-- Detail pane
 
 function addon.MI_GuildPanel_UpdateDetail(name)
     for _, row in ipairs(linkedRows) do row:Hide(); row:ClearAllPoints() end
     detailActionBtn:Hide(); detailDestructBtn:Hide()
-    detailActionBtn:SetScript("OnClick", nil)
-    detailDestructBtn:SetScript("OnClick", nil)
+    detailActionBtn:SetScript("OnClick", nil); detailDestructBtn:SetScript("OnClick", nil)
+    detailRoleTankCB:SetScript("OnClick", nil)
+    detailRoleHealCB:SetScript("OnClick", nil)
+    detailRoleDpsCB:SetScript("OnClick", nil)
 
     if not name then
         detailNameLabel:SetText("|cff333333Select a member from the roster|r")
-        detailStatusLabel:SetText("")
-        detailNoteLabel:SetText("")
-        detailJoinLabel:SetText("")
-        detailNickLabel:Hide()
-        detailNickBtn:Hide()
+        detailStatusLabel:SetText(""); detailNoteLabel:SetText("")
+        detailJoinLabel:SetText(""); detailLastSeenLabel:SetText("")
+        detailInactiveLabel:Hide(); detailJoinEditBtn:Hide()
+        detailNickLabel:Hide(); detailNickBtn:Hide()
+        detailRoleTankCB:Hide(); detailRoleTankCB.roleLbl:Hide()
+        detailRoleHealCB:Hide(); detailRoleHealCB.roleLbl:Hide()
+        detailRoleDpsCB:Hide();  detailRoleDpsCB.roleLbl:Hide()
+        if detailRolesHdr then detailRolesHdr:Hide() end
         linkedChild:SetHeight(20)
         return
     end
 
-    local groupIdx, group, isMain = addon.MI_Guild_GetGroupForChar(name)
+    local mainName, group, isMain = addon.MI_Guild_GetGroupForChar(name)
+    local charData = GetCharData(name)
     local level, classDisplay, classToken, publicNote, officerNote = GetMemberInfo(name)
-    local cc = ClassColor(classToken)
-    local infoStr = (level > 0 and classDisplay ~= "") and
-        ("|cff888888" .. level .. " " .. classDisplay .. "|r  ") or ""
+    local cc     = ClassColor(classToken)
+    local infoStr = (level > 0 and classDisplay ~= "") and ("|cff888888" .. level .. " " .. classDisplay .. "|r  ") or ""
 
     detailNameLabel:SetText(cc .. name .. "|r")
 
     -- Notes
     local noteLines = {}
-    if publicNote ~= "" then
-        table.insert(noteLines, "|cff888888Note:|r " .. publicNote)
-    end
-    if officerNote ~= "" then
-        table.insert(noteLines, "|cff666666Officer:|r " .. officerNote)
-    end
+    if publicNote  ~= "" then table.insert(noteLines, "|cff888888Note:|r " .. publicNote) end
+    if officerNote ~= "" then table.insert(noteLines, "|cff666666Officer:|r " .. officerNote) end
     detailNoteLabel:SetText(table.concat(noteLines, "\n"))
 
-    -- Join date: show oldest across the whole linked group (or just this char if unlinked)
-    local chars = { group and group.main or name }
-    if group then
-        for _, a in ipairs(group.alts) do table.insert(chars, a) end
-    end
-    local joinTimestamp = GetOldestJoinDate(chars)
-    if joinTimestamp then
-        detailJoinLabel:SetText("|cff666666Joined:|r " .. date("%b %d, %Y", joinTimestamp))
+    -- Last seen
+    local lastSeen = charData and charData.lastSeen
+    if lastSeen then
+        detailLastSeenLabel:SetText("|cff666666Last seen:|r " .. FormatDaysAgo(lastSeen))
     else
-        detailJoinLabel:SetText("")
+        detailLastSeenLabel:SetText("|cff444444Last seen:|r |cff444444Unknown|r")
     end
 
+    -- Join date (oldest across linked group)
+    local charNames = { group and group.main or name }
+    if group then for _, a in ipairs(group.alts) do table.insert(charNames, a) end end
+    local joinTs = GetOldestJoinDate(charNames)
+    if joinTs then
+        detailJoinLabel:SetText("|cff666666Joined:|r " .. FormatDate(joinTs))
+    else
+        detailJoinLabel:SetText("|cff444444Joined:|r |cff444444Unknown|r")
+    end
+    detailJoinEditBtn:Show()
+    detailJoinEditBtn:SetScript("OnClick", function()
+        local curStr = joinTs and FormatDate(joinTs) or ""
+        ShowInputDialog("Join date (YYYY-MM-DD or Unknown):", function(input)
+            local ts = ParseDateInput(input)
+            if ts ~= nil then
+                addon.MI_Guild_SetJoinDate(name, ts)
+                addon.MI_GuildPanel_Refresh()
+            end
+        end, true, curStr, true)
+    end)
+
+    -- Inactivity warning
+    if IsInactive(lastSeen) then
+        detailInactiveLabel:SetText("|cffff8800⚠ Inactive|r")
+        detailInactiveLabel:Show()
+    else
+        detailInactiveLabel:Hide()
+    end
+
+    -- Roles
+    if detailRolesHdr then detailRolesHdr:Show() end
+    local roles = charData and charData.roles or "000"
+    detailRoleTankCB:SetChecked(roles:sub(1,1) == "1"); detailRoleTankCB:Show(); detailRoleTankCB.roleLbl:Show()
+    detailRoleHealCB:SetChecked(roles:sub(2,2) == "1"); detailRoleHealCB:Show(); detailRoleHealCB.roleLbl:Show()
+    detailRoleDpsCB:SetChecked(roles:sub(3,3) == "1");  detailRoleDpsCB:Show();  detailRoleDpsCB.roleLbl:Show()
+
+    local function OnRoleClick()
+        local t = detailRoleTankCB:GetChecked() and "1" or "0"
+        local h = detailRoleHealCB:GetChecked() and "1" or "0"
+        local d = detailRoleDpsCB:GetChecked() and "1" or "0"
+        addon.MI_Guild_SetRoles(name, t .. h .. d)
+    end
+    detailRoleTankCB:SetScript("OnClick", OnRoleClick)
+    detailRoleHealCB:SetScript("OnClick", OnRoleClick)
+    detailRoleDpsCB:SetScript("OnClick", OnRoleClick)
+
     if not group then
-        detailNickLabel:Hide()
-        detailNickBtn:Hide()
+        detailNickLabel:Hide(); detailNickBtn:Hide()
         detailStatusLabel:SetText(infoStr .. "|cff555555Not linked|r")
         linkedChild:SetHeight(20)
 
         detailActionBtn:SetPoint("TOPLEFT", linkedScroll, "BOTTOMLEFT", 0, -6)
-        detailActionBtn.lbl:SetText("Set as Main")
-        StyleGoldButton(detailActionBtn)
-        detailActionBtn:Show()
+        detailActionBtn.lbl:SetText("Set as Main"); StyleGoldButton(detailActionBtn); detailActionBtn:Show()
         detailActionBtn:SetScript("OnClick", function()
-            addon.MI_Guild_SetAsMain(name)
-            addon.MI_GuildPanel_Refresh()
+            addon.MI_Guild_SetAsMain(name); addon.MI_GuildPanel_Refresh()
         end)
 
         detailDestructBtn:SetPoint("TOPRIGHT", linkedScroll, "BOTTOMRIGHT", 0, -6)
-        detailDestructBtn.lbl:SetText("Link as Alt...")
-        StyleGoldButton(detailDestructBtn)
-        detailDestructBtn:Show()
+        detailDestructBtn.lbl:SetText("Link as Alt..."); StyleGoldButton(detailDestructBtn); detailDestructBtn:Show()
         detailDestructBtn:SetScript("OnClick", function()
-            ShowInputDialog("Link " .. name .. " as alt of:", function(mainName)
-                addon.MI_Guild_LinkAltToMain(name, mainName)
-                addon.MI_GuildPanel_Refresh()
+            ShowInputDialog("Link " .. name .. " as alt of:", function(mn)
+                addon.MI_Guild_LinkAltToMain(name, mn); addon.MI_GuildPanel_Refresh()
             end)
         end)
         return
@@ -552,28 +700,25 @@ function addon.MI_GuildPanel_UpdateDetail(name)
 
     -- Nick row
     local nick = group.nick
-    detailNickLabel:SetText(nick and ("|cff666666Nick:|r " .. nick) or "|cff333333Nick:|r |cff333333none|r")
+    detailNickLabel:SetText(nick and ("|cff666666Nick:|r " .. nick) or "|cff333333Nick: none|r")
     detailNickLabel:Show()
     detailNickBtn.lbl:SetText(nick and "Edit Nick" or "Set Nick")
     detailNickBtn:SetScript("OnClick", function()
         ShowInputDialog("Nickname for " .. group.main .. ":", function(newNick)
-            addon.MI_Guild_SetNick(groupIdx, newNick)
-            addon.MI_GuildPanel_Refresh()
+            addon.MI_Guild_SetNick(group.main, newNick); addon.MI_GuildPanel_Refresh()
         end, true, nick or "", true)
     end)
     detailNickBtn:Show()
 
     if isMain then
-        local n = #group.alts
-        detailStatusLabel:SetText(infoStr .. "|cffffcc00Main|r" .. (n > 0 and (" - " .. n .. " alt" .. (n == 1 and "" or "s")) or ""))
+        detailStatusLabel:SetText(infoStr .. "|cffffcc00Main|r")
     else
         detailStatusLabel:SetText(infoStr .. "Alt of |cffffcc00" .. group.main .. "|r")
     end
 
-    -- Build linked character list: main first, then alts
+    -- Linked characters
     local members = { group.main }
     for _, a in ipairs(group.alts) do table.insert(members, a) end
-
     local yOff = 0
     for i, charName in ipairs(members) do
         local row = GetOrCreateLinkedRow(i)
@@ -582,123 +727,160 @@ function addon.MI_GuildPanel_UpdateDetail(name)
         row.charName = charName
         local isThisMain = (charName == group.main)
         local isCurrent  = (charName == name)
-
         local cLvl, _, cToken = GetMemberInfo(charName)
         local cColor  = ClassColor(cToken)
         local cLvlStr = cLvl > 0 and ("|cff666666" .. cLvl .. "|r ") or ""
         local mainTag = isThisMain and "|cffffcc00[M]|r " or ""
         row.nameLabel:SetText(mainTag .. cLvlStr .. cColor .. charName .. "|r")
         row.hl:SetColorTexture(0.25, 0.2, 0.05, isCurrent and 0.16 or 0)
-
-        if isThisMain then
-            row.setMainBtn:Hide()
-        else
-            row.setMainBtn:Show()
-        end
-        row:Show()
-        yOff = yOff + ROW_H
+        if isThisMain then row.setMainBtn:Hide() else row.setMainBtn:Show() end
+        row:Show(); yOff = yOff + ROW_H
     end
     linkedChild:SetHeight(math.max(yOff, 20))
 
     detailActionBtn:SetPoint("TOPLEFT", linkedScroll, "BOTTOMLEFT", 0, -6)
-    detailActionBtn.lbl:SetText("Link Alt...")
-    StyleGoldButton(detailActionBtn)
-    detailActionBtn:Show()
+    detailActionBtn.lbl:SetText("Link Alt..."); StyleGoldButton(detailActionBtn); detailActionBtn:Show()
     detailActionBtn:SetScript("OnClick", function()
         ShowInputDialog("Add alt to " .. group.main .. ":", function(altName)
-            addon.MI_Guild_LinkAltToMain(altName, group.main)
-            addon.MI_GuildPanel_Refresh()
+            addon.MI_Guild_LinkAltToMain(altName, group.main); addon.MI_GuildPanel_Refresh()
         end)
     end)
 
     detailDestructBtn:SetPoint("TOPRIGHT", linkedScroll, "BOTTOMRIGHT", 0, -6)
     if isMain then
-        detailDestructBtn.lbl:SetText("Delete Group")
-        StyleRedButton(detailDestructBtn)
+        detailDestructBtn.lbl:SetText("Delete Group"); StyleRedButton(detailDestructBtn)
         detailDestructBtn:SetScript("OnClick", function()
-            addon.MI_Guild_DeleteGroup(groupIdx)
-            selectedName = nil
-            addon.MI_GuildPanel_Refresh()
+            addon.MI_Guild_DeleteGroup(group.main); selectedName = nil; addon.MI_GuildPanel_Refresh()
         end)
     else
-        detailDestructBtn.lbl:SetText("Unlink Me")
-        StyleRedButton(detailDestructBtn)
+        detailDestructBtn.lbl:SetText("Unlink Me"); StyleRedButton(detailDestructBtn)
         detailDestructBtn:SetScript("OnClick", function()
-            addon.MI_Guild_UnlinkChar(name)
-            addon.MI_GuildPanel_Refresh()
+            addon.MI_Guild_UnlinkChar(name); addon.MI_GuildPanel_Refresh()
         end)
     end
     detailDestructBtn:Show()
 end
 
--- ── Roster list builder ────────────────────────────────────────────────────────
+-- ---------------------------------------------------------------------------------
+-- Roster list builder
 
 local function BuildRosterList()
     local filter = filterBox and filterBox:GetText() or ""
     filter = filter:match("^%s*(.-)%s*$")
     rosterEntries = BuildRosterEntries(filter)
 
-    for _, row in ipairs(rosterRows) do row:Hide(); row:ClearAllPoints(); row.hl:SetColorTexture(0, 0, 0, 0) end
+    for _, row in ipairs(rosterRows) do
+        row:Hide(); row:ClearAllPoints(); row.hl:SetColorTexture(0, 0, 0, 0)
+    end
 
     if not addon.MI_Guild_guildName then
         local row = GetOrCreateRosterRow(1)
-        row:SetPoint("TOPLEFT", rosterChild, "TOPLEFT", 0, 0)
-        row:SetWidth(LEFT_W - 20)
-        row.nameLabel:SetText("|cff555555Not in a guild.|r")
-        row.statusLabel:SetText("")
-        row.entryName = nil
-        row.hl:SetColorTexture(0, 0, 0, 0)
-        row:Show()
-        rosterChild:SetHeight(ROW_H)
+        row:SetPoint("TOPLEFT", rosterChild, "TOPLEFT", 0, 0); row:SetWidth(LEFT_W - 20)
+        row.nameLabel:SetText("|cff555555Not in a guild.|r"); row.statusLabel:SetText("")
+        row.entryName = nil; row.collapseBtn:Hide(); row.inactiveMark:Hide()
+        row.roleIconTank:Hide(); row.roleIconHeal:Hide(); row.roleIconDps:Hide()
+        row:Show(); rosterChild:SetHeight(ROW_H)
         return
     end
 
     if #rosterEntries == 0 then
         local row = GetOrCreateRosterRow(1)
-        row:SetPoint("TOPLEFT", rosterChild, "TOPLEFT", 0, 0)
-        row:SetWidth(LEFT_W - 20)
-        row.nameLabel:SetText("|cff444444No members found.|r")
-        row.statusLabel:SetText("")
-        row.entryName = nil
-        row.hl:SetColorTexture(0, 0, 0, 0)
-        row:Show()
-        rosterChild:SetHeight(ROW_H)
+        row:SetPoint("TOPLEFT", rosterChild, "TOPLEFT", 0, 0); row:SetWidth(LEFT_W - 20)
+        row.nameLabel:SetText("|cff444444No members found.|r"); row.statusLabel:SetText("")
+        row.entryName = nil; row.collapseBtn:Hide(); row.inactiveMark:Hide()
+        row.roleIconTank:Hide(); row.roleIconHeal:Hide(); row.roleIconDps:Hide()
+        row:Show(); rosterChild:SetHeight(ROW_H)
         return
     end
 
-    local prevGroupMain = nil  -- nil means "no previous group seen yet"
     local yOff = 0
-    for i, entry in ipairs(rosterEntries) do
+    local rowIdx = 0
+    local prevGroupMain = nil
+
+    for _, entry in ipairs(rosterEntries) do
         local groupMain = entry.group and entry.group.main
-        if groupMain ~= prevGroupMain then
-            if i > 1 then yOff = yOff + 3 end  -- 3px visual gap between groups
-            prevGroupMain = groupMain
-        end
 
-        local row = GetOrCreateRosterRow(i)
-        row:SetPoint("TOPLEFT", rosterChild, "TOPLEFT", 0, -yOff)
-        row:SetWidth(LEFT_W - 20)
-        row.entryName = entry.name
+        -- Skip alts whose main is collapsed (only when name-sorted so groups are contiguous)
+        local skip = sortKey == "name" and entry.group and not entry.isMain and collapsedMains[entry.group.main]
+        if not skip then
+            -- Visual gap between groups
+            if groupMain ~= prevGroupMain then
+                if rowIdx > 0 then yOff = yOff + 3 end
+                prevGroupMain = groupMain
+            end
 
-        local cc = ClassColor(entry.classToken)
-        local lvl = entry.level > 0 and ("|cff666666" .. entry.level .. "|r ") or ""
-        if entry.group and not entry.isMain then
-            row.nameLabel:SetText("  " .. lvl .. cc .. entry.name .. "|r")
-        else
-            row.nameLabel:SetText(lvl .. cc .. entry.name .. "|r")
-        end
-        row.statusLabel:SetText(StatusText(entry))
+            rowIdx = rowIdx + 1
+            local row = GetOrCreateRosterRow(rowIdx)
+            row:SetPoint("TOPLEFT", rosterChild, "TOPLEFT", 0, -yOff)
+            row:SetWidth(LEFT_W - 20)
+            row.entryName = entry.name
+            row.mainName  = groupMain
 
-        if entry.name == selectedName then
-            row.hl:SetColorTexture(0.28, 0.22, 0.05, 0.25)
+            -- Class color bar
+            local cr, cg, cb = ClassColorRGB(entry.classToken)
+            row.colorBar:SetColorTexture(cr, cg, cb, 0.7)
+
+            -- Name (indented for alts)
+            local cc     = ClassColor(entry.classToken)
+            local lvlStr = entry.level > 0 and ("|cff666666" .. entry.level .. "|r ") or ""
+            local indent = (entry.group and not entry.isMain) and "  " or ""
+            row.nameLabel:SetText(indent .. lvlStr .. cc .. entry.name .. "|r")
+
+            -- Collapse toggle (only for mains with alts, only when name-sorted)
+            local hasAlts = entry.group and #entry.group.alts > 0
+            if sortKey == "name" and entry.isMain and hasAlts then
+                row.collapseBtn:Show()
+                row.collapseBtn.lbl:SetText(collapsedMains[entry.name] and "[+]" or "[-]")
+                row.collapseBtn:SetScript("OnClick", function()
+                    collapsedMains[entry.name] = not collapsedMains[entry.name]
+                    BuildRosterList()
+                end)
+            else
+                row.collapseBtn:Hide()
+            end
+
+            -- Role icons
+            local roles = entry.roles or "000"
+            if roles:sub(1,1) == "1" then
+                row.roleIconTank:SetAtlas("roleicon-tiny-tank", false); row.roleIconTank:Show()
+            else row.roleIconTank:Hide() end
+            if roles:sub(2,2) == "1" then
+                row.roleIconHeal:SetAtlas("roleicon-tiny-healer", false); row.roleIconHeal:Show()
+            else row.roleIconHeal:Hide() end
+            if roles:sub(3,3) == "1" then
+                row.roleIconDps:SetAtlas("roleicon-tiny-dps", false); row.roleIconDps:Show()
+            else row.roleIconDps:Hide() end
+
+            -- Inactive mark
+            if IsInactive(entry.lastSeen) then
+                row.inactiveMark:SetText("⚠"); row.inactiveMark:Show()
+            else
+                row.inactiveMark:Hide()
+            end
+
+            -- Status: M for main, blank for alts/unlinked
+            if entry.isMain then
+                row.statusLabel:SetText("|cffffcc00M|r")
+            elseif not entry.group then
+                row.statusLabel:SetText("|cff2a2a2a-|r")
+            else
+                row.statusLabel:SetText("")
+            end
+
+            -- Selection highlight
+            if entry.name == selectedName then
+                row.hl:SetColorTexture(0.28, 0.22, 0.05, 0.25)
+            end
+
+            row:Show()
+            yOff = yOff + ROW_H
         end
-        row:Show()
-        yOff = yOff + ROW_H
     end
     rosterChild:SetHeight(math.max(yOff, 100))
 end
 
--- ── Log builder ───────────────────────────────────────────────────────────────
+-- ---------------------------------------------------------------------------------
+-- Activity log
 
 local TYPE_COLOR = {
     JOIN    = "|cff55dd55",
@@ -712,7 +894,7 @@ local function BuildLogText()
     if #entries == 0 then return "|cff444444(No activity logged yet)|r" end
     local lines = {}
     for i = #entries, 1, -1 do
-        local e = entries[i]
+        local e   = entries[i]
         local ts  = date("|cff444444[%m/%d %H:%M]|r", e.t)
         local col = TYPE_COLOR[e.type] or ""
         local text
@@ -732,19 +914,297 @@ local function BuildLogText()
     return table.concat(lines, "\n")
 end
 
--- ── Panel builder ─────────────────────────────────────────────────────────────
+local function FormatAgo(sec)
+    if sec < 60    then return sec .. "s ago"
+    elseif sec < 3600 then return math.floor(sec / 60) .. "m ago"
+    else                   return math.floor(sec / 3600) .. "h ago"
+    end
+end
+
+-- ---------------------------------------------------------------------------------
+-- Sync popup (new design)
+
+local function RefreshSyncPopup()
+    if not syncPopup or not syncPopup:IsShown() then return end
+
+    local peers    = addon.MI_GuildSync_GetPeerStatuses and addon.MI_GuildSync_GetPeerStatuses() or {}
+    local isLeader = addon.MI_GuildSync_IsLeader and addon.MI_GuildSync_IsLeader() or false
+    local leader   = addon.MI_GuildSync_GetLeader and addon.MI_GuildSync_GetLeader() or nil
+
+    -- Leader line
+    if isLeader then
+        syncPopupLeaderLbl:SetText("|cff44aa44You are the sync leader|r")
+    elseif leader then
+        syncPopupLeaderLbl:SetText("Leader: |cffffcc00" .. leader .. "|r")
+    else
+        syncPopupLeaderLbl:SetText("|cff666666No leader elected|r")
+    end
+
+    -- Find min stale modified for Sync All
+    local hasStale, minStaleModified = false, math.huge
+    for _, p in ipairs(peers) do
+        if p.status == "stale" then
+            hasStale = true
+            if (p.maxModified or 0) < minStaleModified then minStaleModified = p.maxModified or 0 end
+        end
+    end
+
+    if syncPopupAllBtn then
+        if isLeader and hasStale then
+            syncPopupAllBtn:Show()
+            syncPopupAllBtn:SetScript("OnClick", function()
+                addon.MI_GuildSync_BroadcastDelta(minStaleModified, nil)
+            end)
+        else
+            syncPopupAllBtn:Hide()
+        end
+    end
+
+    local N = #peers
+    local ROW_H_P = 20
+
+    for i = 1, N do
+        if not syncPopupRows[i] then
+            local row = CreateFrame("Frame", nil, syncPopup)
+            row:SetHeight(ROW_H_P)
+
+            local sep = row:CreateTexture(nil, "BACKGROUND")
+            sep:SetHeight(1); sep:SetPoint("TOPLEFT", 4, 0); sep:SetPoint("TOPRIGHT", -4, 0)
+            sep:SetColorTexture(0.22, 0.18, 0.04, 0.3)
+
+            row.nameLbl = MakeLabel(row, FONT, 10)
+            row.nameLbl:SetPoint("LEFT", 8, -1)
+            row.nameLbl:SetPoint("RIGHT", -82, -1)
+            row.nameLbl:SetJustifyH("LEFT")
+
+            row.statusLbl = MakeLabel(row, FONT, 9)
+            row.statusLbl:SetPoint("RIGHT", -4, -1)
+            row.statusLbl:SetWidth(74)
+            row.statusLbl:SetJustifyH("RIGHT")
+
+            local syncBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
+            syncBtn:SetSize(58, 15); syncBtn:SetPoint("RIGHT", -4, -1)
+            StyleGoldButton(syncBtn)
+            local syncLbl = MakeLabel(syncBtn, FONT, 9, GOLD_R, GOLD_G, GOLD_B)
+            syncLbl:SetAllPoints(); syncLbl:SetJustifyH("CENTER"); syncLbl:SetText("Sync →")
+            row.syncBtn = syncBtn
+            syncPopupRows[i] = row
+        end
+
+        local row  = syncPopupRows[i]
+        local peer = peers[i]
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT",  syncPopup, "TOPLEFT",  0, -(56 + (i - 1) * ROW_H_P))
+        row:SetPoint("TOPRIGHT", syncPopup, "TOPRIGHT", 0, -(56 + (i - 1) * ROW_H_P))
+
+        local rankSuffix = peer.rankName ~= "" and (" |cff777777" .. peer.rankName .. "|r") or ""
+        row.nameLbl:SetText(peer.name .. rankSuffix)
+
+        if peer.status == "synced" then
+            row.statusLbl:SetText("|cff44aa44✓ Synced|r")
+            row.syncBtn:Hide()
+        elseif peer.status == "stale" then
+            row.statusLbl:SetText("|cffcc8833⚠ Stale|r")
+            if isLeader then
+                row.syncBtn:Show()
+                row.statusLbl:Hide()
+                local peerMaxMod = peer.maxModified or 0
+                local peerName   = peer.name
+                row.syncBtn:SetScript("OnClick", function()
+                    addon.MI_GuildSync_BroadcastDelta(peerMaxMod, peerName)
+                end)
+            else
+                row.syncBtn:Hide()
+                row.statusLbl:Show()
+            end
+        else
+            row.statusLbl:SetText("|cff666666? Unknown|r")
+            row.statusLbl:Show(); row.syncBtn:Hide()
+        end
+
+        row:Show()
+    end
+    for i = N + 1, #syncPopupRows do syncPopupRows[i]:Hide() end
+
+    if N == 0 then syncPopupNoPeers:Show() else syncPopupNoPeers:Hide() end
+
+    local peerH = math.max(N, 1) * ROW_H_P
+    local totalH = 56 + peerH + (isLeader and hasStale and 34 or 8)
+    syncPopup:SetHeight(totalH)
+    if syncPopupAllBtn then
+        syncPopupAllBtn:ClearAllPoints()
+        syncPopupAllBtn:SetPoint("BOTTOM", syncPopup, "BOTTOM", 0, 8)
+    end
+end
+
+local function BuildSyncPopup()
+    if syncPopup then return end
+
+    syncPopup = CreateFrame("Frame", "MysteriousQoL_SyncPopup", UIParent, "BackdropTemplate")
+    syncPopup:SetWidth(300)
+    syncPopup:SetPoint("TOPLEFT", panelFrame, "TOPRIGHT", 4, 0)
+    syncPopup:SetFrameStrata("HIGH")
+    syncPopup:SetFrameLevel(panelFrame:GetFrameLevel() + 5)
+    syncPopup:SetBackdrop(MakeBackdrop())
+    syncPopup:SetBackdropColor(0.06, 0.06, 0.06, 0.97)
+    syncPopup:SetBackdropBorderColor(0.45, 0.35, 0.08, 0.8)
+    syncPopup:Hide()
+
+    table.insert(UISpecialFrames, "MysteriousQoL_SyncPopup")
+
+    local accent = syncPopup:CreateTexture(nil, "ARTWORK")
+    accent:SetHeight(2)
+    accent:SetPoint("TOPLEFT", 1, -1); accent:SetPoint("TOPRIGHT", -1, -1)
+    accent:SetColorTexture(0.75, 0.60, 0.12, 1)
+
+    local titleLbl = MakeLabel(syncPopup, FONT, 11, GOLD_R, GOLD_G, GOLD_B)
+    titleLbl:SetPoint("TOPLEFT", 8, -8)
+    titleLbl:SetText("Guild Sync")
+
+    local closeBtn = CreateFrame("Button", nil, syncPopup, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    closeBtn:SetScript("OnClick", function() syncPopup:Hide() end)
+
+    syncPopupLeaderLbl = MakeLabel(syncPopup, FONT, 10, 0.65, 0.65, 0.65)
+    syncPopupLeaderLbl:SetPoint("TOPLEFT", 8, -26)
+
+    local sectionHdr = MakeLabel(syncPopup, FONT, 9, 0.50, 0.42, 0.12)
+    sectionHdr:SetPoint("TOPLEFT", 8, -42)
+    sectionHdr:SetText("PEERS")
+
+    syncPopupNoPeers = MakeLabel(syncPopup, FONT, 10, 0.4, 0.4, 0.4)
+    syncPopupNoPeers:SetPoint("TOPLEFT", 12, -58)
+    syncPopupNoPeers:SetText("No peers online")
+    syncPopupNoPeers:Hide()
+
+    syncPopupAllBtn = CreateFrame("Button", nil, syncPopup, "BackdropTemplate")
+    syncPopupAllBtn:SetSize(130, 22)
+    StyleGoldButton(syncPopupAllBtn)
+    local allLbl = MakeLabel(syncPopupAllBtn, FONT, 10, GOLD_R, GOLD_G, GOLD_B)
+    allLbl:SetAllPoints(); allLbl:SetJustifyH("CENTER"); allLbl:SetText("Sync All Stale")
+    syncPopupAllBtn:Hide()
+end
+
+-- ---------------------------------------------------------------------------------
+-- GRM import popup
+
+local importPopup = nil
+
+local MONTH_NUM = {Jan=1,Feb=2,Mar=3,Apr=4,May=5,Jun=6,Jul=7,Aug=8,Sep=9,Oct=10,Nov=11,Dec=12}
+local DAYS_IN_MONTH = {31,28,31,30,31,30,31,31,30,31,30,31}
+
+local function GRMDateToTimestamp(s)
+    local day, mon, yr = s:match("(%d+)%s+(%a+)%s+'(%d+)")
+    if not day then return nil end
+    local m = MONTH_NUM[mon]; if not m then return nil end
+    day, yr = tonumber(day), tonumber(yr) + 2000
+    local days = 0
+    for y = 1970, yr - 1 do
+        days = days + (((y%4==0 and y%100~=0) or y%400==0) and 366 or 365)
+    end
+    local dim = {table.unpack(DAYS_IN_MONTH)}
+    if (yr%4==0 and yr%100~=0) or yr%400==0 then dim[2] = 29 end
+    for i = 1, m - 1 do days = days + dim[i] end
+    return (days + day - 1) * 86400 + 43200
+end
+
+local function ParseGRMLog(text)
+    local dates = {}
+    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+        local edate, rest = line:match("^%d+%)%s+(%d+%s+%a+%s+'%d+)%s+%d+:%d+[ap]m%s*:%s*(.+)")
+        if edate and rest then
+            local char, orig
+            local reinvited = rest:match("%S+%s+has%s+REINVITED%s+(%S+)%s+to%s+the%s+guild")
+            local rejoined  = rest:match("^(%S+)%s+has%s+REJOINED%s+the%s+guild")
+            local joined    = rest:match("^(%S+)%s+has%s+JOINED%s+the%s+guild")
+            if reinvited or rejoined then
+                char = reinvited or rejoined
+                orig = line:match("Date Originally Joined:%s+(%d+%s+%a+%s+'%d+)") or edate
+            elseif joined then
+                char, orig = joined, edate
+            end
+            if char and orig then
+                local ts = GRMDateToTimestamp(orig)
+                if ts and (not dates[char] or ts < dates[char]) then dates[char] = ts end
+            end
+        end
+    end
+    return dates
+end
+
+local function BuildImportPopup()
+    if importPopup then return end
+    importPopup = CreateFrame("Frame", "MysteriousQoL_ImportPopup", UIParent, "BackdropTemplate")
+    importPopup:SetSize(500, 380); importPopup:SetPoint("CENTER")
+    importPopup:SetFrameStrata("DIALOG"); importPopup:SetMovable(true); importPopup:EnableMouse(true)
+    importPopup:RegisterForDrag("LeftButton")
+    importPopup:SetScript("OnDragStart", importPopup.StartMoving)
+    importPopup:SetScript("OnDragStop",  importPopup.StopMovingOrSizing)
+    importPopup:SetBackdrop(MakeBackdrop())
+    importPopup:SetBackdropColor(0.06, 0.06, 0.06, 0.97)
+    importPopup:SetBackdropBorderColor(0.45, 0.35, 0.08, 0.8)
+    importPopup:Hide()
+
+    local title = MakeLabel(importPopup, FONT, 12, GOLD_R, GOLD_G, GOLD_B)
+    title:SetPoint("TOPLEFT", 10, -8); title:SetText("Import Join Dates from GRM Log")
+
+    local closeBtn = CreateFrame("Button", nil, importPopup, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    closeBtn:SetScript("OnClick", function() importPopup:Hide() end)
+
+    local instr = MakeLabel(importPopup, FONT, 10, 0.7, 0.7, 0.7)
+    instr:SetPoint("TOPLEFT", 10, -28); instr:SetWidth(480)
+    instr:SetText("Paste your GRM log export below and click Import.")
+
+    local scroll = CreateFrame("ScrollFrame", nil, importPopup, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 10, -48); scroll:SetPoint("BOTTOMRIGHT", -30, 50)
+
+    local editBox = CreateFrame("EditBox", nil, scroll, "BackdropTemplate")
+    editBox:SetSize(450, 1000); editBox:SetMultiLine(true); editBox:SetAutoFocus(false)
+    editBox:SetFont(FONT, 10, ""); editBox:SetTextColor(0.9, 0.9, 0.9, 1)
+    editBox:SetBackdrop(MakeBackdrop())
+    editBox:SetBackdropColor(0.04, 0.04, 0.04, 1)
+    editBox:SetBackdropBorderColor(0.30, 0.24, 0.06, 0.7)
+    editBox:SetScript("OnEscapePressed", function() importPopup:Hide() end)
+    scroll:SetScrollChild(editBox)
+
+    local statusLbl = MakeLabel(importPopup, FONT, 10, 0.7, 0.7, 0.7)
+    statusLbl:SetPoint("BOTTOMLEFT", 10, 16); statusLbl:SetWidth(300); statusLbl:SetText("")
+
+    local importBtn = CreateFrame("Button", nil, importPopup, "BackdropTemplate")
+    importBtn:SetSize(88, 22); importBtn:SetPoint("BOTTOMRIGHT", -10, 14)
+    StyleGoldButton(importBtn)
+    local btnLbl = MakeLabel(importBtn, FONT, 11, GOLD_R, GOLD_G, GOLD_B)
+    btnLbl:SetAllPoints(); btnLbl:SetJustifyH("CENTER"); btnLbl:SetText("Import")
+    importBtn:SetScript("OnClick", function()
+        local text = editBox:GetText()
+        if not text or text == "" then statusLbl:SetText("Nothing to import."); return end
+        local dates = ParseGRMLog(text)
+        local count, total = 0, 0
+        for name, ts in pairs(dates) do
+            total = total + 1
+            local existing = GetCharData(name)
+            if not existing or not existing.joinDate or ts < existing.joinDate then
+                addon.MI_Guild_SetJoinDate(name, ts)
+                count = count + 1
+            end
+        end
+        statusLbl:SetText("Imported " .. count .. " dates from " .. total .. " parsed.")
+        if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
+    end)
+end
+
+-- ---------------------------------------------------------------------------------
+-- Main panel construction
 
 local function BuildPanel()
     panelFrame = CreateFrame("Frame", "MysteriousQoL_GuildPanel", UIParent, "BackdropTemplate")
-    panelFrame:SetSize(PW, PH)
-    panelFrame:SetPoint("CENTER")
-    panelFrame:SetFrameStrata("HIGH")
-    panelFrame:SetClampedToScreen(true)
-    panelFrame:SetMovable(true)
-    panelFrame:EnableMouse(true)
+    panelFrame:SetSize(PW, PH); panelFrame:SetPoint("CENTER")
+    panelFrame:SetFrameStrata("HIGH"); panelFrame:SetClampedToScreen(true)
+    panelFrame:SetMovable(true); panelFrame:EnableMouse(true)
     panelFrame:RegisterForDrag("LeftButton")
     panelFrame:SetScript("OnDragStart", panelFrame.StartMoving)
-    panelFrame:SetScript("OnDragStop", panelFrame.StopMovingOrSizing)
+    panelFrame:SetScript("OnDragStop",  panelFrame.StopMovingOrSizing)
     panelFrame:SetBackdrop(MakeBackdrop())
     panelFrame:SetBackdropColor(0.06, 0.06, 0.06, 0.97)
     panelFrame:SetBackdropBorderColor(0.45, 0.35, 0.08, 0.8)
@@ -759,19 +1219,15 @@ local function BuildPanel()
     accent:SetColorTexture(0.75, 0.60, 0.12, 1)
 
     local title = MakeLabel(panelFrame, FONT, 13, GOLD_R, GOLD_G, GOLD_B)
-    title:SetPoint("TOPLEFT", 10, -8)
-    title:SetText("Guild Manager")
+    title:SetPoint("TOPLEFT", 10, -8); title:SetText("Guild Manager")
 
     local closeBtn = CreateFrame("Button", nil, panelFrame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -2, -2)
     closeBtn:SetScript("OnClick", function() panelFrame:Hide() end)
 
-    -- ── Toolbar ──────────────────────────────────────────────────────────────
-
     local function MakeToolbarButton(label, x, onClick)
         local btn = CreateFrame("Button", nil, panelFrame, "BackdropTemplate")
-        btn:SetSize(88, 22)
-        btn:SetPoint("TOPLEFT", x, -26)
+        btn:SetSize(88, 22); btn:SetPoint("TOPLEFT", x, -26)
         StyleGoldButton(btn)
         local lbl = MakeLabel(btn, FONT, 11, GOLD_R, GOLD_G, GOLD_B)
         lbl:SetAllPoints(); lbl:SetJustifyH("CENTER"); lbl:SetText(label)
@@ -779,61 +1235,54 @@ local function BuildPanel()
         return btn
     end
 
-    MakeToolbarButton("Sync Now", 8, function()
-        addon.MI_GuildSync_Broadcast()
+    local syncBtn = MakeToolbarButton("Sync...", 8, function()
+        BuildSyncPopup()
+        if syncPopup:IsShown() then
+            syncPopup:Hide()
+        else
+            if addon.MI_GuildSync_BroadcastHello then addon.MI_GuildSync_BroadcastHello() end
+            RefreshSyncPopup(); syncPopup:Show()
+        end
     end)
 
-    -- Search / filter box
+    MakeToolbarButton("Import...", 100, function()
+        BuildImportPopup()
+        if importPopup:IsShown() then importPopup:Hide() else importPopup:Show() end
+    end)
+
+    -- Filter search box (top right)
     local searchLabel = MakeLabel(panelFrame, FONT, 10, 0.50, 0.42, 0.12)
-    searchLabel:SetPoint("TOPRIGHT", -120, -31)
-    searchLabel:SetText("FILTER:")
+    searchLabel:SetPoint("TOPRIGHT", -120, -31); searchLabel:SetText("FILTER:")
 
     filterBox = CreateFrame("EditBox", nil, panelFrame, "BackdropTemplate")
-    filterBox:SetSize(106, 20)
-    filterBox:SetPoint("TOPRIGHT", -8, -26)
-    filterBox:SetFont(FONT, 11, "")
-    filterBox:SetTextColor(1, 1, 1, 1)
-    filterBox:SetAutoFocus(false)
+    filterBox:SetSize(106, 20); filterBox:SetPoint("TOPRIGHT", -8, -26)
+    filterBox:SetFont(FONT, 11, ""); filterBox:SetTextColor(1, 1, 1, 1); filterBox:SetAutoFocus(false)
     filterBox:SetBackdrop(MakeBackdrop())
     filterBox:SetBackdropColor(0.04, 0.04, 0.04, 1)
     filterBox:SetBackdropBorderColor(0.40, 0.32, 0.08, 0.7)
-    filterBox:SetScript("OnTextChanged", function()
-        BuildRosterList()
-        rosterScroll:SetVerticalScroll(0)
-    end)
-    filterBox:SetScript("OnEscapePressed", function()
-        filterBox:SetText(""); filterBox:ClearFocus()
-    end)
+    filterBox:SetScript("OnTextChanged", function() BuildRosterList(); rosterScroll:SetVerticalScroll(0) end)
+    filterBox:SetScript("OnEscapePressed", function() filterBox:SetText(""); filterBox:ClearFocus() end)
 
+    -- Toolbar separator
     local toolSep = panelFrame:CreateTexture(nil, "ARTWORK")
-    toolSep:SetHeight(1)
-    toolSep:SetPoint("TOPLEFT", 1, -50)
-    toolSep:SetPoint("TOPRIGHT", -1, -50)
+    toolSep:SetHeight(1); toolSep:SetPoint("TOPLEFT", 1, -50); toolSep:SetPoint("TOPRIGHT", -1, -50)
     toolSep:SetColorTexture(0.32, 0.26, 0.06, 0.5)
 
-    -- ── Content area ──────────────────────────────────────────────────────────
+    local contentTop = -54  -- just below toolbar separator
 
-    local contentTop = -54  -- Y offset from panel top edge, just below the toolbar separator
-    local listTop    = contentTop - 22  -- Y offset where the scrollable list starts (below the filter radio row)
-
-    -- Radio row: All / Mains / Alts / Unlinked (mutually exclusive) + Online Only checkbox
+    -- Radio row: All / Mains / Alts / Unlinked + Online Only
     local function UpdateRosterRadios()
-        radioAll:SetChecked(rosterFilter == "all")
-        radioMains:SetChecked(rosterFilter == "mains")
-        radioAlts:SetChecked(rosterFilter == "alts")
-        radioUnlinked:SetChecked(rosterFilter == "unlinked")
+        radioAll:SetChecked(rosterFilter == "all");     radioMains:SetChecked(rosterFilter == "mains")
+        radioAlts:SetChecked(rosterFilter == "alts");   radioUnlinked:SetChecked(rosterFilter == "unlinked")
         onlineOnlyBtn:SetChecked(onlineOnly)
     end
 
     local function MakeRadioOption(label, x)
-        local btn = CreateFrame("CheckButton", "MIGuildRadio_"..label, panelFrame, "UIRadioButtonTemplate")
+        local btn = CreateFrame("CheckButton", "MIGuildRadio_" .. label, panelFrame, "UIRadioButtonTemplate")
         btn:SetPoint("TOPLEFT", x, contentTop + 2)
         local lbl = panelFrame:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT, 10, "")
-        lbl:SetTextColor(0.85, 0.75, 0.45)
-        lbl:SetPoint("LEFT", btn, "RIGHT", 2, 0)
-        lbl:SetText(label)
-        btn.myLabel = lbl
+        lbl:SetFont(FONT, 10, ""); lbl:SetTextColor(0.85, 0.75, 0.45)
+        lbl:SetPoint("LEFT", btn, "RIGHT", 2, 0); lbl:SetText(label)
         return btn
     end
 
@@ -843,13 +1292,10 @@ local function BuildPanel()
     radioUnlinked = MakeRadioOption("Unlinked", 140)
 
     onlineOnlyBtn = CreateFrame("CheckButton", "MIGuildOnlineOnly", panelFrame, "UICheckButtonTemplate")
-    onlineOnlyBtn:SetSize(18, 18)
-    onlineOnlyBtn:SetPoint("TOPLEFT", 212, contentTop + 1)
+    onlineOnlyBtn:SetSize(18, 18); onlineOnlyBtn:SetPoint("TOPLEFT", 212, contentTop + 1)
     local onlineLbl = panelFrame:CreateFontString(nil, "OVERLAY")
-    onlineLbl:SetFont(FONT, 10, "")
-    onlineLbl:SetTextColor(0.85, 0.75, 0.45)
-    onlineLbl:SetPoint("LEFT", onlineOnlyBtn, "RIGHT", 2, 0)
-    onlineLbl:SetText("Online Only")
+    onlineLbl:SetFont(FONT, 10, ""); onlineLbl:SetTextColor(0.85, 0.75, 0.45)
+    onlineLbl:SetPoint("LEFT", onlineOnlyBtn, "RIGHT", 2, 0); onlineLbl:SetText("Online Only")
 
     radioAll:SetScript("OnClick", function()
         rosterFilter = "all"; UpdateRosterRadios(); BuildRosterList()
@@ -868,158 +1314,209 @@ local function BuildPanel()
     end)
     UpdateRosterRadios()
 
+    -- Sort bar (below radio row)
+    local sortBarY = contentTop - 22  -- y offset for sort bar
+    local listTop  = sortBarY - 20    -- roster list starts below sort bar
+
+    local sortBarHdr = MakeLabel(panelFrame, FONT, 9, 0.40, 0.33, 0.10)
+    sortBarHdr:SetPoint("TOPLEFT", 4, sortBarY - 1)
+    sortBarHdr:SetText("SORT:")
+
+    local sortDefs = {
+        { key = "name",     label = "Name",     x = 38  },
+        { key = "level",    label = "Level",    x = 100 },
+        { key = "lastseen", label = "Last Seen", x = 150 },
+        { key = "joined",   label = "Joined",   x = 220 },
+    }
+
+    local function UpdateSortBtns()
+        for _, def in ipairs(sortDefs) do
+            local btn = sortBtns[def.key]
+            if btn then
+                local arrow = (sortKey == def.key) and (sortAsc and " ▲" or " ▼") or ""
+                local col   = (sortKey == def.key) and ("|cffffcc00" .. def.label .. arrow .. "|r") or ("|cff666666" .. def.label .. "|r")
+                btn.lbl:SetText(col)
+            end
+        end
+    end
+
+    for _, def in ipairs(sortDefs) do
+        local btn = CreateFrame("Button", nil, panelFrame)
+        btn:SetSize(58, 16); btn:SetPoint("TOPLEFT", def.x, sortBarY)
+        local lbl = btn:CreateFontString(nil, "OVERLAY")
+        lbl:SetFont(FONT, 10, ""); lbl:SetAllPoints(); lbl:SetJustifyH("LEFT")
+        btn.lbl = lbl
+        btn:SetScript("OnClick", function()
+            if sortKey == def.key then
+                sortAsc = not sortAsc
+            else
+                sortKey = def.key; sortAsc = true
+            end
+            UpdateSortBtns(); BuildRosterList(); rosterScroll:SetVerticalScroll(0)
+        end)
+        sortBtns[def.key] = btn
+    end
+    UpdateSortBtns()
+
+    -- Vertical divider
     local detailHdr = MakeLabel(panelFrame, FONT, 9, 0.50, 0.42, 0.12)
     detailHdr:SetPoint("TOPLEFT", LEFT_W + 16, contentTop + 2)
     detailHdr:SetText("SELECTED CHARACTER")
 
-    -- Vertical divider between roster and detail panes
     local divider = panelFrame:CreateTexture(nil, "ARTWORK")
     divider:SetWidth(1)
     divider:SetPoint("TOPLEFT",    LEFT_W + 8, listTop)
     divider:SetPoint("BOTTOMLEFT", LEFT_W + 8, 22)
     divider:SetColorTexture(0.32, 0.26, 0.06, 0.5)
 
-    -- Stats bar along the bottom
+    -- Stats bar
     local statsSep = panelFrame:CreateTexture(nil, "ARTWORK")
     statsSep:SetHeight(1)
-    statsSep:SetPoint("BOTTOMLEFT",  1,  20)
-    statsSep:SetPoint("BOTTOMRIGHT", -1, 20)
+    statsSep:SetPoint("BOTTOMLEFT", 1, 20); statsSep:SetPoint("BOTTOMRIGHT", -1, 20)
     statsSep:SetColorTexture(0.28, 0.22, 0.05, 0.4)
 
     statsLabel = MakeLabel(panelFrame, FONT, 9, 0.5, 0.5, 0.5)
-    statsLabel:SetPoint("BOTTOMLEFT",  8,  6)
-    statsLabel:SetPoint("BOTTOMRIGHT", -8, 6)
+    statsLabel:SetPoint("BOTTOMLEFT", 8, 6); statsLabel:SetPoint("BOTTOMRIGHT", -8, 6)
     statsLabel:SetJustifyH("LEFT")
 
-    -- Resize grip (bottom-right corner): drag left/right to scale the panel
+    -- Scale grip
     local grip = CreateFrame("Frame", nil, panelFrame)
-    grip:SetSize(14, 14)
-    grip:SetPoint("BOTTOMRIGHT", -2, 2)
-    grip:EnableMouse(true)
+    grip:SetSize(14, 14); grip:SetPoint("BOTTOMRIGHT", -2, 2); grip:EnableMouse(true)
     local function MakeDot(x, y)
         local t = grip:CreateTexture(nil, "OVERLAY")
-        t:SetSize(3, 3); t:SetPoint("BOTTOMRIGHT", x, y)
-        t:SetColorTexture(0.55, 0.44, 0.10, 0.5)
+        t:SetSize(3, 3); t:SetPoint("BOTTOMRIGHT", x, y); t:SetColorTexture(0.55, 0.44, 0.10, 0.5)
     end
-    MakeDot(-1, 1); MakeDot(-5, 1); MakeDot(-1, 5)
-    MakeDot(-9, 1); MakeDot(-5, 5); MakeDot(-1, 9)
-    grip:SetScript("OnEnter", function()
-        for _, tex in ipairs({grip:GetRegions()}) do tex:SetAlpha(1) end
-    end)
-    grip:SetScript("OnLeave", function()
-        for _, tex in ipairs({grip:GetRegions()}) do tex:SetAlpha(0.5) end
-    end)
+    MakeDot(-1, 1); MakeDot(-5, 1); MakeDot(-1, 5); MakeDot(-9, 1); MakeDot(-5, 5); MakeDot(-1, 9)
+    grip:SetScript("OnEnter", function() for _, t in ipairs({grip:GetRegions()}) do t:SetAlpha(1) end end)
+    grip:SetScript("OnLeave", function() for _, t in ipairs({grip:GetRegions()}) do t:SetAlpha(0.5) end end)
     local gripDragging, gripStartX, gripStartScale = false, 0, 1.0
     grip:SetScript("OnMouseDown", function(_, btn)
         if btn ~= "LeftButton" then return end
-        gripDragging   = true
-        gripStartX     = GetCursorPosition()
-        gripStartScale = panelFrame:GetScale()
+        gripDragging = true; gripStartX = GetCursorPosition(); gripStartScale = panelFrame:GetScale()
     end)
     grip:SetScript("OnMouseUp", function() gripDragging = false end)
     grip:SetScript("OnUpdate", function()
         if not gripDragging then return end
         local cx = GetCursorPosition()
-        -- 600 pixels of drag = full 1.0 scale change; clamp between 0.6 and 1.4
         local newScale = math.max(0.6, math.min(1.4, gripStartScale + (cx - gripStartX) / 600))
-        local snapped  = math.floor(newScale / 0.05 + 0.5) * 0.05  -- snap to nearest 0.05
-        addon.db.guild_panel_scale = snapped
-        panelFrame:SetScale(snapped)
+        local snapped  = math.floor(newScale / 0.05 + 0.5) * 0.05
+        addon.db.guild_panel_scale = snapped; panelFrame:SetScale(snapped)
     end)
 
-    -- ── Left pane: roster scroll ──────────────────────────────────────────────
-
+    -- Left pane: roster scroll
     rosterScroll = CreateFrame("ScrollFrame", "MysteriousQoL_GuildRosterScroll", panelFrame)
     rosterScroll:SetPoint("TOPLEFT",    4, listTop)
     rosterScroll:SetPoint("BOTTOMLEFT", 4, 22)
     rosterScroll:SetWidth(LEFT_W)
     rosterScroll:EnableMouseWheel(true)
     rosterScroll:SetScript("OnMouseWheel", function(self, delta)
-        local cur = self:GetVerticalScroll()
-        local max = self:GetVerticalScrollRange()
+        local cur = self:GetVerticalScroll(); local max = self:GetVerticalScrollRange()
         self:SetVerticalScroll(math.max(0, math.min(max, cur - delta * ROW_H * 3)))
     end)
 
     rosterChild = CreateFrame("Frame", nil, rosterScroll)
-    rosterChild:SetWidth(LEFT_W - 4)
-    rosterChild:SetHeight(100)
+    rosterChild:SetWidth(LEFT_W - 4); rosterChild:SetHeight(100)
     rosterScroll:SetScrollChild(rosterChild)
-
     MakeScrollbar(rosterScroll, rosterChild, 16)
 
-    -- ── Right pane: detail block ──────────────────────────────────────────────
+    -- Right pane
+    local rightX = LEFT_W + 14
 
-    local rightX = LEFT_W + 14  -- X start for all right-pane content
-
-    -- Name + status
     detailNameLabel = MakeLabel(panelFrame, FONT, 13, 1, 1, 1)
     detailNameLabel:SetPoint("TOPLEFT", rightX, listTop)
-    detailNameLabel:SetWidth(PW - LEFT_W - 26)
-    detailNameLabel:SetJustifyH("LEFT")
+    detailNameLabel:SetWidth(PW - LEFT_W - 26); detailNameLabel:SetJustifyH("LEFT")
     detailNameLabel:SetText("|cff333333Select a member from the roster|r")
 
     detailStatusLabel = MakeLabel(panelFrame, FONT, 10, 0.6, 0.6, 0.6)
-    detailStatusLabel:SetPoint("TOPLEFT", rightX, listTop - 20)
-    detailStatusLabel:SetWidth(PW - LEFT_W - 26)
-    detailStatusLabel:SetJustifyH("LEFT")
+    detailStatusLabel:SetPoint("TOPLEFT", rightX, listTop - 18)
+    detailStatusLabel:SetWidth(PW - LEFT_W - 26); detailStatusLabel:SetJustifyH("LEFT")
 
-    -- Nick display (only shown for linked characters)
     detailNickLabel = MakeLabel(panelFrame, FONT, 9, 0.45, 0.45, 0.45)
-    detailNickLabel:SetPoint("TOPLEFT", rightX, listTop - 33)
-    detailNickLabel:SetWidth(PW - LEFT_W - 26 - 68)
-    detailNickLabel:SetJustifyH("LEFT")
+    detailNickLabel:SetPoint("TOPLEFT", rightX, listTop - 32)
+    detailNickLabel:SetWidth(PW - LEFT_W - 26 - 68); detailNickLabel:SetJustifyH("LEFT")
     detailNickLabel:Hide()
 
     detailNickBtn = CreateFrame("Button", nil, panelFrame, "BackdropTemplate")
-    detailNickBtn:SetSize(62, 14)
-    detailNickBtn:SetPoint("TOPRIGHT", -6, listTop - 33)
+    detailNickBtn:SetSize(62, 14); detailNickBtn:SetPoint("TOPRIGHT", -6, listTop - 32)
     StyleGoldButton(detailNickBtn)
     detailNickBtn.lbl = MakeLabel(detailNickBtn, FONT, 8, GOLD_R, GOLD_G, GOLD_B)
     detailNickBtn.lbl:SetAllPoints(); detailNickBtn.lbl:SetJustifyH("CENTER")
     detailNickBtn:Hide()
 
-    -- Public / officer notes (up to 2 lines)
     detailNoteLabel = MakeLabel(panelFrame, FONT, 9, 0.55, 0.55, 0.55)
-    detailNoteLabel:SetPoint("TOPLEFT", rightX, listTop - 48)
-    detailNoteLabel:SetWidth(PW - LEFT_W - 26)
-    detailNoteLabel:SetJustifyH("LEFT")
+    detailNoteLabel:SetPoint("TOPLEFT", rightX, listTop - 46)
+    detailNoteLabel:SetWidth(PW - LEFT_W - 26); detailNoteLabel:SetJustifyH("LEFT")
 
-    -- Join date (oldest across linked characters)
+    detailLastSeenLabel = MakeLabel(panelFrame, FONT, 9, 0.45, 0.45, 0.45)
+    detailLastSeenLabel:SetPoint("TOPLEFT", rightX, listTop - 66)
+    detailLastSeenLabel:SetWidth(PW - LEFT_W - 26); detailLastSeenLabel:SetJustifyH("LEFT")
+
+    -- Join date row with edit button
     detailJoinLabel = MakeLabel(panelFrame, FONT, 9, 0.45, 0.45, 0.45)
-    detailJoinLabel:SetPoint("TOPLEFT", rightX, listTop - 70)
-    detailJoinLabel:SetWidth(PW - LEFT_W - 26)
-    detailJoinLabel:SetJustifyH("LEFT")
+    detailJoinLabel:SetPoint("TOPLEFT", rightX, listTop - 80)
+    detailJoinLabel:SetWidth(PW - LEFT_W - 26 - 68); detailJoinLabel:SetJustifyH("LEFT")
 
+    detailJoinEditBtn = CreateFrame("Button", nil, panelFrame, "BackdropTemplate")
+    detailJoinEditBtn:SetSize(62, 14); detailJoinEditBtn:SetPoint("TOPRIGHT", -6, listTop - 80)
+    StyleGoldButton(detailJoinEditBtn)
+    detailJoinEditBtn.lbl = MakeLabel(detailJoinEditBtn, FONT, 8, GOLD_R, GOLD_G, GOLD_B)
+    detailJoinEditBtn.lbl:SetAllPoints(); detailJoinEditBtn.lbl:SetJustifyH("CENTER")
+    detailJoinEditBtn.lbl:SetText("Edit Date")
+    detailJoinEditBtn:Hide()
+
+    -- Role checkboxes
+    detailRolesHdr = MakeLabel(panelFrame, FONT, 9, 0.40, 0.33, 0.10)
+    detailRolesHdr:SetPoint("TOPLEFT", rightX, listTop - 96)
+    detailRolesHdr:SetText("ROLES:")
+    detailRolesHdr:Hide()
+
+    local function MakeRoleCB(parent, label, xOffset)
+        local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+        cb:SetSize(16, 16); cb:SetPoint("TOPLEFT", rightX + xOffset, listTop - 96)
+        cb:Hide()
+        local lbl = parent:CreateFontString(nil, "OVERLAY")
+        lbl:SetFont(FONT, 10, ""); lbl:SetTextColor(0.7, 0.7, 0.7, 1)
+        lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0); lbl:SetText(label)
+        cb.roleLbl = lbl
+        return cb
+    end
+
+    detailRoleTankCB = MakeRoleCB(panelFrame, "Tank",   46)
+    detailRoleHealCB = MakeRoleCB(panelFrame, "Healer", 104)
+    detailRoleDpsCB  = MakeRoleCB(panelFrame, "DPS",    170)
+
+    -- Inactivity warning
+    detailInactiveLabel = MakeLabel(panelFrame, FONT, 10, 1, 0.5, 0, 1)
+    detailInactiveLabel:SetPoint("TOPLEFT", rightX, listTop - 114)
+    detailInactiveLabel:SetWidth(PW - LEFT_W - 26)
+    detailInactiveLabel:Hide()
+
+    -- Linked characters section
     local linkedHdr = MakeLabel(panelFrame, FONT, 9, 0.50, 0.42, 0.12)
-    linkedHdr:SetPoint("TOPLEFT", rightX, listTop - 90)
+    linkedHdr:SetPoint("TOPLEFT", rightX, listTop - 128)
     linkedHdr:SetText("LINKED CHARACTERS")
 
     local linkedSep = panelFrame:CreateTexture(nil, "ARTWORK")
     linkedSep:SetHeight(1)
-    linkedSep:SetPoint("TOPLEFT",  rightX, listTop - 101)
-    linkedSep:SetPoint("TOPRIGHT", -6,     listTop - 101)
+    linkedSep:SetPoint("TOPLEFT",  rightX, listTop - 139)
+    linkedSep:SetPoint("TOPRIGHT", -6,     listTop - 139)
     linkedSep:SetColorTexture(0.30, 0.24, 0.06, 0.45)
 
-    -- Mini scroll for linked characters
     linkedScroll = CreateFrame("ScrollFrame", "MysteriousQoL_GuildLinkedScroll", panelFrame)
-    linkedScroll:SetPoint("TOPLEFT", rightX, listTop - 105)
+    linkedScroll:SetPoint("TOPLEFT", rightX, listTop - 143)
     linkedScroll:SetWidth(PW - LEFT_W - 26)
     linkedScroll:SetHeight(ROW_H * 4)
     linkedScroll:EnableMouseWheel(true)
     linkedScroll:SetScript("OnMouseWheel", function(self, delta)
-        local cur = self:GetVerticalScroll()
-        local max = self:GetVerticalScrollRange()
+        local cur = self:GetVerticalScroll(); local max = self:GetVerticalScrollRange()
         self:SetVerticalScroll(math.max(0, math.min(max, cur - delta * ROW_H * 3)))
     end)
 
     linkedChild = CreateFrame("Frame", nil, linkedScroll)
-    linkedChild:SetWidth(PW - LEFT_W - 36)
-    linkedChild:SetHeight(20)
+    linkedChild:SetWidth(PW - LEFT_W - 36); linkedChild:SetHeight(20)
     linkedScroll:SetScrollChild(linkedChild)
-
     MakeScrollbar(linkedScroll, linkedChild, 12)
 
-    -- Action buttons (repositioned each time UpdateDetail runs)
     detailActionBtn = CreateFrame("Button", nil, panelFrame, "BackdropTemplate")
     detailActionBtn:SetSize(PW - LEFT_W - 26 - 96 - 8, 20)
     StyleGoldButton(detailActionBtn)
@@ -1034,9 +1531,8 @@ local function BuildPanel()
     detailDestructBtn.lbl:SetAllPoints(); detailDestructBtn.lbl:SetJustifyH("CENTER")
     detailDestructBtn:Hide()
 
-    -- ── Right pane: horizontal separator between detail and log ───────────────
-
-    local midSepY = listTop - DETAIL_H  -- Y where the detail block ends and the log begins
+    -- Log section
+    local midSepY = listTop - DETAIL_H
 
     local midSep = panelFrame:CreateTexture(nil, "ARTWORK")
     midSep:SetHeight(1)
@@ -1045,31 +1541,26 @@ local function BuildPanel()
     midSep:SetColorTexture(0.30, 0.24, 0.06, 0.45)
 
     local logHdr = MakeLabel(panelFrame, FONT, 9, 0.50, 0.42, 0.12)
-    logHdr:SetPoint("TOPLEFT", rightX, midSepY - 4)
-    logHdr:SetText("ACTIVITY LOG")
+    logHdr:SetPoint("TOPLEFT", rightX, midSepY - 4); logHdr:SetText("ACTIVITY LOG")
 
-    -- Log scroll
     local logScroll = CreateFrame("ScrollFrame", "MysteriousQoL_GuildLogScroll", panelFrame)
-    logScroll:SetPoint("TOPLEFT",    rightX, midSepY - 18)
-    logScroll:SetPoint("BOTTOMRIGHT", -4,    22)
+    logScroll:SetPoint("TOPLEFT",     rightX, midSepY - 18)
+    logScroll:SetPoint("BOTTOMRIGHT", -4,     22)
     logScroll:EnableMouseWheel(true)
     logScroll:SetScript("OnMouseWheel", function(self, delta)
-        local cur = self:GetVerticalScroll()
-        local max = self:GetVerticalScrollRange()
+        local cur = self:GetVerticalScroll(); local max = self:GetVerticalScrollRange()
         self:SetVerticalScroll(math.max(0, math.min(max, cur - delta * 20)))
     end)
 
     logEdit = CreateFrame("EditBox", nil, logScroll)
-    logEdit:SetMultiLine(true)
-    logEdit:SetAutoFocus(false)
-    logEdit:SetFont(FONT, 10, "")
-    logEdit:SetTextColor(1, 1, 1, 1)
-    logEdit:SetWidth(PW - LEFT_W - 26)
-    logEdit:SetScript("OnEscapePressed", function() panelFrame:Hide() end)
+    logEdit:SetMultiLine(true); logEdit:SetAutoFocus(false)
+    logEdit:SetFont(FONT, 10, ""); logEdit:SetTextColor(1, 1, 1, 1)
+    logEdit:SetWidth(PW - LEFT_W - 26); logEdit:SetEnabled(false)
     logScroll:SetScrollChild(logEdit)
 end
 
--- ── Public API ────────────────────────────────────────────────────────────────
+-- ---------------------------------------------------------------------------------
+-- Public API
 
 function addon.MI_GuildPanel_Init()
     -- Panel built lazily on first use.
@@ -1090,12 +1581,11 @@ function addon.MI_GuildPanel_Refresh()
     if not panelFrame then return end
     BuildRosterList()
     addon.MI_GuildPanel_UpdateDetail(selectedName)
+    RefreshSyncPopup()
     logEdit:SetText(BuildLogText())
     if statsLabel then statsLabel:SetText(BuildStatsText()) end
     C_Timer.After(0, function()
         local logScroll = logEdit:GetParent()
-        if logScroll and logScroll.SetVerticalScroll then
-            logScroll:SetVerticalScroll(0)
-        end
+        if logScroll and logScroll.SetVerticalScroll then logScroll:SetVerticalScroll(0) end
     end)
 end

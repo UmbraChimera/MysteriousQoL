@@ -1,11 +1,9 @@
 local _, addon = ...
 
--- ── Spell IDs ────────────────────────────────────────────────────────────────
 local VIGOR_SPELL          = 372608
 local SECOND_WIND_SPELL    = 425782
 local WHIRLING_SURGE_SPELL = 361584
 
--- ── Constants ────────────────────────────────────────────────────────────────
 local NUM_CHARGES          = 6
 local THROTTLE             = 0.0333   -- ~30 FPS
 local MAX_SPEED            = 85       -- max forward speed for bar scaling
@@ -14,7 +12,6 @@ local THRILL_THRESHOLD     = 6.003    -- Thrill of the Skies activates above thi
 local GROUND_SKIM_DURATION = 8.28     -- Ground Skimming buff duration in seconds
 local BAR_TEXTURE          = [[Interface\Buttons\WHITE8x8]]
 
--- ── Teal color scheme ────────────────────────────────────────────────────────
 local COLOR = {
     charge     = { r = 0.00, g = 0.80, b = 0.80 },  -- #00cccc teal
     thrill     = { r = 1.00, g = 0.66, b = 0.00 },  -- gold (thrill of flight)
@@ -23,8 +20,6 @@ local COLOR = {
     bg         = { r = 0.10, g = 0.10, b = 0.10 },  -- dark background
     border     = { r = 0.00, g = 0.00, b = 0.00 },  -- black border
 }
-
--- ── Helpers ──────────────────────────────────────────────────────────────────
 
 local function IsSkyriding()
     if not C_PlayerInfo or not C_PlayerInfo.GetGlidingInfo then return false end
@@ -66,13 +61,9 @@ local function GetWhirlingSurgeCooldown()
     return data.startTime, data.duration
 end
 
--- ── State ────────────────────────────────────────────────────────────────────
-
 local prevSpeed      = 0
 local elapsed        = 0
 local lastColorState = nil
-
--- ── UI elements ──────────────────────────────────────────────────────────────
 
 local updateFrame
 local mainFrame, speedBar, speedText
@@ -80,8 +71,6 @@ local chargeBars     = {}
 local chargeDividers = {}
 local secondWindBars = {}
 local surgeFrame, surgeCooldown, surgeBorder
-
--- ── Layout ───────────────────────────────────────────────────────────────────
 
 local function UpdateLayout()
     if not mainFrame then return end
@@ -153,8 +142,6 @@ local function UpdateLayout()
     lastColorState = nil
 end
 
--- ── Color application ────────────────────────────────────────────────────────
-
 local function ApplyColors(isThrill)
     local state = "speed"
     if isThrill then state = "thrill" end
@@ -171,8 +158,6 @@ local function ApplyColors(isThrill)
         chargeBars[i]:SetStatusBarColor(COLOR.charge.r, COLOR.charge.g, COLOR.charge.b)
     end
 end
-
--- ── Update functions ─────────────────────────────────────────────────────────
 
 local function UpdateSpeedBar(rawSpeed)
     local scaled = math.min(rawSpeed / MAX_SPEED, 1.0)
@@ -234,8 +219,6 @@ local function UpdateWhirlingSurge(startTime, duration)
     end
 end
 
--- ── Main OnUpdate ────────────────────────────────────────────────────────────
-
 local function OnUpdate(self, dt)
     elapsed = elapsed + dt
     if elapsed < THROTTLE then return end
@@ -279,8 +262,6 @@ local function OnUpdate(self, dt)
         UpdateWhirlingSurge(0, 0)
     end
 end
-
--- ── Build UI ─────────────────────────────────────────────────────────────────
 
 local function BuildUI()
     mainFrame = CreateFrame("Frame", "MysteriousQoL_Dragonriding", UIParent, "BackdropTemplate")
@@ -369,8 +350,6 @@ local function BuildUI()
 
     UpdateLayout()
 end
-
--- ── Init ─────────────────────────────────────────────────────────────────────
 
 local function StartUpdating()
     if updateFrame then return end

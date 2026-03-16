@@ -1,7 +1,5 @@
 local _, addon = ...
 
--- ── Class buff table ───────────────────────────────────────────────────────────
-
 local CLASS_BUFFS = {
     DRUID   = { spellID = 1126,   label = "Mark of the Wild" },
     MAGE    = { spellID = 1459,   label = "Arcane Intellect" },
@@ -11,8 +9,6 @@ local CLASS_BUFFS = {
     SHAMAN  = { spellID = 462854, label = "Skyfury" },
 }
 
--- ── Suppression helper ─────────────────────────────────────────────────────────
-
 local function isSuppressed()
     return UnitIsDeadOrGhost("player")
         or IsMounted()
@@ -21,8 +17,6 @@ local function isSuppressed()
         or UnitOnTaxi("player")
         or IsResting()
 end
-
--- ── Buff check helpers ─────────────────────────────────────────────────────────
 
 local function anyoneMissingBuff(spellID, spellName)
     if not C_UnitAuras.GetPlayerAuraBySpellID(spellID) then return true end
@@ -49,8 +43,6 @@ local function getBuffReminder()
     return entry
 end
 
--- ── Buff display frame (icon + pulsing glow) ───────────────────────────────────
-
 local BUFF_ICON_SIZE = 52
 
 local buffFrame = CreateFrame("Frame", "MysteriousQoL_BuffReminderFrame", UIParent)
@@ -75,8 +67,6 @@ fadeOut:SetFromAlpha(1.0)
 fadeOut:SetToAlpha(0.35)
 fadeOut:SetDuration(0.55)
 fadeOut:SetOrder(2)
-
--- ── Update ─────────────────────────────────────────────────────────────────────
 
 function addon.MI_BuffReminder_Update()
     local entry = getBuffReminder()

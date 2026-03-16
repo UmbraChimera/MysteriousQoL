@@ -1,7 +1,5 @@
 local _, addon = ...
 
--- ── Durability check ─────────────────────────────────────────────────────────
-
 local function needsRepair()
     if not addon.db.combat_repairReminder_enabled then return false end
     if UnitAffectingCombat("player") then return false end
@@ -13,8 +11,6 @@ local function needsRepair()
     end
     return false
 end
-
--- ── Display frame ──────────────────────────────────────────────────────────
 
 local repairFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_RepairReminderFrame", {
     baseY    = -60,
@@ -28,8 +24,6 @@ local repairFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_RepairReminde
     strata   = "HIGH",
     text     = "Fix your shit!",
 })
-
--- ── Update ───────────────────────────────────────────────────────────────────
 
 function addon.MI_RepairReminder_Update()
     if needsRepair() then

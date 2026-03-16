@@ -1,6 +1,5 @@
 local addonName, addon = ...
 
--- ── Minimap Button ─────────────────────────────────────────────────────────
 -- No-library minimap button. Draggable around the minimap ring.
 -- Left-click toggles the custom settings frame.
 
@@ -11,8 +10,6 @@ local BAR_TEX = [[Interface\Buttons\WHITE8x8]]
 
 local button
 local miniMenu, menuClickCatcher
-
--- ── Right-click menu ─────────────────────────────────────────────────────────
 
 local function BuildMinimapMenu()
     -- Click-catcher at FULLSCREEN strata dismisses the menu when clicking outside it.
@@ -167,8 +164,6 @@ local function BuildButton()
 
     UpdatePosition()
 end
-
--- ── Init ───────────────────────────────────────────────────────────────────
 
 function addon.MI_MinimapButton_Init()
     BuildButton()

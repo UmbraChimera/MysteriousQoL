@@ -7,8 +7,6 @@ local addonName, addon = ...
 local RING_TEX = "Interface\\AddOns\\MysteriousQoL\\Assets\\Mouse.tga"
 local DOT_TEX  = "Interface\\AddOns\\MysteriousQoL\\Assets\\Dot.tga"
 
--- ── Runtime state ─────────────────────────────────────────────────────────────
-
 local ringFrame = nil
 
 -- Cached "last applied" values to detect setting changes without full reapply each frame
@@ -22,8 +20,6 @@ local castEnd          = 0
 local castIsChannel    = false
 local castActive       = false
 local castRingSetStart = nil  -- castStart value we last passed to SetCooldown
-
--- ── Helpers ───────────────────────────────────────────────────────────────────
 
 local function getRingColor()
     if addon.db.ui_mouseRing_useClassColor then
@@ -42,8 +38,6 @@ local function isRingVisible()
     if addon.db.ui_mouseRing_onlyOnRightClick and not IsMouseButtonDown("RightButton") then return false end
     return true
 end
-
--- ── Ring frame ────────────────────────────────────────────────────────────────
 
 local function createRingFrame()
     local f = CreateFrame("Frame", "MysteriousQoL_MouseRingFrame", UIParent)
@@ -104,23 +98,20 @@ local function applyRingStyle()
     lastHideDot    = db.ui_mouseRing_hideDot
 end
 
--- ── Cast polling ──────────────────────────────────────────────────────────────
-
 local function pollCast()
     local name, _, _, startMS, endMS = UnitCastingInfo("player")
     if name then
         castActive, castStart, castEnd, castIsChannel = true, startMS, endMS, false
         return
     end
-    local chanName, _, _, startMS2, endMS2 = UnitChannelInfo("player")
-    if chanName then
-        castActive, castStart, castEnd, castIsChannel = true, startMS2, endMS2, true
+    name, _, _, startMS, endMS = UnitChannelInfo("player")
+    if name then
+        castActive, castStart, castEnd, castIsChannel = true, startMS, endMS, true
         return
     end
     castActive = false
 end
 
--- ── OnUpdate runner ───────────────────────────────────────────────────────────
 -- Parented to UIParent so it is always available; only runs when shown.
 
 local runner = CreateFrame("Frame", nil, UIParent)
@@ -190,8 +181,6 @@ runner:SetScript("OnUpdate", function()
         ringFrame.castRing:Hide()
     end
 end)
-
--- ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 local function enableRing()
     if not ringFrame then ringFrame = createRingFrame() end

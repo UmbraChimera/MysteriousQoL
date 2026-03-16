@@ -1,18 +1,14 @@
 local _, addon = ...
 
--- ── Death check ────────────────────────────────────────────────────────────────
-
 local function getDeathReminder()
     if not addon.db.combat_deathReminder_enabled then return false end
     if not UnitIsDeadOrGhost("player") then return false end
     if not IsInRaid() then return false end
     local _, instanceType, difficultyID = GetInstanceInfo()
     if instanceType ~= "raid" then return false end
-    local isLFR = select(8, GetDifficultyInfo(difficultyID))
+    local _, _, _, _, _, _, isLFR = GetDifficultyInfo(difficultyID)
     return not isLFR
 end
-
--- ── Display frame ──────────────────────────────────────────────────────────────
 
 local deathFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_DeathReminderFrame", {
     baseY    = 0,
@@ -27,7 +23,7 @@ local deathFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_DeathReminderF
     text     = "Don't release you dolt!",
 })
 
--- ── Release Protection (Alt-hold blocker) ───────────────────────────────────────
+-- Release protection: hold Alt for 1 second to release
 
 local HOLD_DURATION = 1.0
 
@@ -109,8 +105,6 @@ blockerEvents:SetScript("OnEvent", function(_, event)
         blocker:Hide()
     end
 end)
-
--- ── Update ─────────────────────────────────────────────────────────────────────
 
 function addon.MI_DeathReminder_Update()
     if getDeathReminder() then

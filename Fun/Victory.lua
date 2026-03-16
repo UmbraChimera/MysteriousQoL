@@ -13,26 +13,19 @@ local ACHIEVEMENTS = {
     [629] = true,
 }
 
-local listener = CreateFrame("Frame")
-
-local function OnAchievement(_, _, achievementID)
-    if not ACHIEVEMENTS[achievementID] then return end
-    PlaySoundFile(SOUND, addon.db.fun_victory_channel)
-end
-
 -- Only listen for achievements while inside an instance
-local zone = CreateFrame("Frame")
-zone:RegisterEvent("PLAYER_ENTERING_WORLD")
-zone:SetScript("OnEvent", function()
-    if not addon.db.fun_victory_enabled then
-        listener:UnregisterEvent("ACHIEVEMENT_EARNED")
-        return
-    end
-    local inInstance = IsInInstance()
-    if inInstance then
-        listener:RegisterEvent("ACHIEVEMENT_EARNED")
-        listener:SetScript("OnEvent", OnAchievement)
+local f = CreateFrame("Frame")
+f:RegisterEvent("PLAYER_ENTERING_WORLD")
+f:SetScript("OnEvent", function(_, event, _, _, achievementID)
+    if event == "ACHIEVEMENT_EARNED" then
+        if ACHIEVEMENTS[achievementID] then
+            PlaySoundFile(SOUND, addon.db.fun_victory_channel)
+        end
     else
-        listener:UnregisterEvent("ACHIEVEMENT_EARNED")
+        if addon.db.fun_victory_enabled and IsInInstance() then
+            f:RegisterEvent("ACHIEVEMENT_EARNED")
+        else
+            f:UnregisterEvent("ACHIEVEMENT_EARNED")
+        end
     end
 end)

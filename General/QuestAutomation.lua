@@ -14,7 +14,6 @@ f:RegisterEvent("GOSSIP_SHOW")
 f:SetScript("OnEvent", function(_, event)
     if IsAltKeyDown() then return end
 
-    -- ── Auto Accept ──────────────────────────────────────────────────────────
     if event == "QUEST_DETAIL" then
         if not addon.db.general_autoQuestAccept then return end
         if QuestGetAutoAccept and QuestGetAutoAccept() then
@@ -32,7 +31,6 @@ f:SetScript("OnEvent", function(_, event)
         return
     end
 
-    -- ── Auto Turn-In ─────────────────────────────────────────────────────────
     if event == "QUEST_PROGRESS" then
         if not addon.db.general_autoQuestTurnIn then return end
         if IsQuestCompletable() then
@@ -50,7 +48,6 @@ f:SetScript("OnEvent", function(_, event)
         return
     end
 
-    -- ── Greeting / Gossip ────────────────────────────────────────────────────
     if event == "QUEST_GREETING" or event == "GOSSIP_SHOW" then
         -- Try turn-in first (completed quests take priority)
         if addon.db.general_autoQuestTurnIn then
