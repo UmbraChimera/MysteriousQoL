@@ -1,15 +1,22 @@
 local _, addon = ...
 
 local SYNC_PREFIX = "MQOL_GUILD"
-local sendQueue = {}
-local sendTicker = nil
-local debugMode  = false
+local sendQueue   = {}
+local sendTicker  = nil
+local debugMode   = false
+
+-- peerInfo[bareName] = { rank=N, maxModified=T, lastHello=T }
+-- Tracks every online MQOL user we have heard from.
+local peerInfo = {}
+local PEER_EXPIRE_SEC = 300  -- 5 minutes without a HELLO = considered offline
+
+-- Timestamp of the last completed outgoing broadcast (full or delta).
+local lastBroadcastTimestamp = 0
 
 local function SyncPrint(msg)
     print("|cff88ccff[GuildSync]|r " .. msg)
 end
 
--- Escape pipe characters so WoW's print() doesn't interpret them as color codes.
 local function EscapeMsg(s)
     return s:gsub("|", "||")
 end
@@ -19,205 +26,338 @@ function addon.MI_GuildSync_ToggleDebug()
     SyncPrint(debugMode and "|cff44ff44Debug ON|r" or "|cffff4444Debug OFF|r")
 end
 
--- Rank threshold parsed from Guild Info. Cached and refreshed on roster update.
--- rankIndex 0 = GM, 1 = first officer rank, etc. Only members with rankIndex <= threshold may SEND.
--- Anyone may receive and merge data regardless of rank.
-local syncRankThreshold = 3  -- default: ranks 0-3 may broadcast
-
-addon.MI_GuildSync_rankThreshold = 3
-addon.MI_GuildSync_lastBroadcast = 0
-addon.MI_GuildSync_lastReceive   = 0
-addon.MI_GuildSync_peerStatus    = {}  -- bare name -> "ok" | "diff"
-
 local function StripRealm(name)
     return name and name:match("^([^%-]+)") or name
 end
 
-local function RefreshSyncRankThreshold()
-    local info = C_GuildInfo.GetInfoText and C_GuildInfo.GetInfoText() or ""
-    local n = info and info:match("%^#MQoL:(%d+)#%^")
-    syncRankThreshold = n and tonumber(n) or 3
-    addon.MI_GuildSync_rankThreshold = syncRankThreshold
+-- Returns the max "modified" timestamp across all chars in the current guild data.
+local function GetMaxModified()
+    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return 0 end
+    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not data or not data.chars then return 0 end
+    local maxMod = 0
+    for _, c in pairs(data.chars) do
+        if (c.modified or 0) > maxMod then maxMod = c.modified end
+    end
+    return maxMod
 end
 
--- Sum of all group.modified timestamps — cheap fingerprint of the alt-group dataset.
+-- Fingerprint: charCount|altCount|modifiedSum
 local function GetDataHash()
-    if not addon.MI_Guild_guildName then return 0 end
-    if not MysteriousQoLDB.guildData then return 0 end
+    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return "0|0|0" end
     local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
-    if not data then return 0 end
-    local h = 0
-    for _, group in ipairs(data.altGroups) do
-        h = h + (group.modified or 0)
+    if not data or not data.chars then return "0|0|0" end
+    local charCount, altCount, modSum = 0, 0, 0
+    for charName, c in pairs(data.chars) do
+        charCount = charCount + 1
+        if c.main ~= charName then altCount = altCount + 1 end
+        modSum = modSum + (c.modified or 0)
     end
-    return h
+    return charCount .. "|" .. altCount .. "|" .. modSum
 end
+
+-- Returns the rank index of the local player (0 = GM). Returns 999 if not found.
+local function GetMyRankIndex()
+    local me = UnitName("player")
+    for i = 1, GetNumGuildMembers() do
+        local name, _, rankIndex = GetGuildRosterInfo(i)
+        if name and StripRealm(name) == me then return rankIndex end
+    end
+    return 999
+end
+
+-- Prune peers that have not sent a HELLO within PEER_EXPIRE_SEC.
+local function PruneExpiredPeers()
+    local now = time()
+    for name, info in pairs(peerInfo) do
+        if (now - (info.lastHello or 0)) > PEER_EXPIRE_SEC then
+            peerInfo[name] = nil
+        end
+    end
+end
+
+-- Determine the current leader: the tracked peer (or self) with the lowest rank index.
+-- Lowest rank index = highest guild rank. Ties broken by name (alphabetical).
+local function GetLeaderName()
+    PruneExpiredPeers()
+    local myName = UnitName("player")
+    local myRank = GetMyRankIndex()
+    local leader, leaderRank = myName, myRank
+
+    for bareName, info in pairs(peerInfo) do
+        local rank = info.rank or 999
+        if rank < leaderRank or (rank == leaderRank and bareName < leader) then
+            leader = bareName
+            leaderRank = rank
+        end
+    end
+    return leader
+end
+
+function addon.MI_GuildSync_GetLeader()
+    return GetLeaderName()
+end
+
+function addon.MI_GuildSync_IsLeader()
+    return GetLeaderName() == UnitName("player")
+end
+
+-- ---------------------------------------------------------------------------------
+-- Send queue: 1 message/sec to avoid throttle failures.
 
 local function FlushQueue()
     if #sendQueue == 0 then
         if sendTicker then sendTicker:Cancel(); sendTicker = nil end
-        if debugMode then SyncPrint("Queue drained — send complete.") end
+        if debugMode then SyncPrint("Queue drained.") end
         if addon.MI_GuildSync_onComplete then
             addon.MI_GuildSync_onComplete()
             addon.MI_GuildSync_onComplete = nil
         end
         return
     end
-    local msg = table.remove(sendQueue, 1)
-    local ok = C_ChatInfo.SendAddonMessage(SYNC_PREFIX, msg, "GUILD")
+    local entry = table.remove(sendQueue, 1)
+    local msg    = entry.msg
+    local target = entry.target
+    local channel = target and "WHISPER" or "GUILD"
+    local ok = C_ChatInfo.SendAddonMessage(SYNC_PREFIX, msg, channel, target)
     if debugMode then
         local status = ok and "|cff44ff44OK|r" or "|cffff4444FAIL|r"
-        SyncPrint("SEND [" .. status .. "] len=" .. #msg .. " remain=" .. #sendQueue
+        SyncPrint("SEND [" .. status .. "] " .. channel .. (target and " → " .. target or "")
+            .. " len=" .. #msg .. " remain=" .. #sendQueue
             .. "  " .. EscapeMsg(msg:sub(1, 60)))
     elseif not ok then
-        -- Always warn on failure even without debug mode
-        SyncPrint("|cffff4444Send failed (throttled?)|r len=" .. #msg .. " remain=" .. #sendQueue)
+        SyncPrint("|cffff4444Send failed (throttled?)|r len=" .. #msg)
     end
 end
 
--- Returns the rankIndex for a guild member from the local roster, or nil if not found.
-local function GetSenderRankIndex(senderName)
-    local bare = StripRealm(senderName)
-    for i = 1, GetNumGuildMembers() do
-        local name, _, rankIndex = GetGuildRosterInfo(i)
-        if name and StripRealm(name) == bare then
-            return rankIndex
-        end
+local function Enqueue(msg, target)
+    table.insert(sendQueue, { msg = msg, target = target })
+    if not sendTicker then
+        sendTicker = C_Timer.NewTicker(1.0, FlushQueue)
     end
-    return nil
 end
 
--- Merge an incoming group into local data using timestamp-wins conflict resolution.
--- When modified matches exactly, append any alts not already present (handles chunked sends).
-local function MergeGroup(main, alts, modified)
-    if not addon.MI_Guild_guildName then return end
-    if not MysteriousQoLDB.guildData then return end
+-- ---------------------------------------------------------------------------------
+-- Merge incoming char data using timestamp-wins conflict resolution.
+
+local function MergeChar(charName, main, nick, joinDateRaw, roles, modified)
+    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return end
     local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
-    if not data then return end
+    if not data or not data.chars then return end
 
-    for _, group in ipairs(data.altGroups) do
-        if group.main == main then
-            -- Always append any alts we don't already have.
-            local have = {}
-            for _, a in ipairs(group.alts) do have[a] = true end
-            local added = 0
-            for _, a in ipairs(alts) do
-                if not have[a] then
-                    table.insert(group.alts, a)
-                    added = added + 1
-                end
-            end
-            if modified > group.modified then
-                group.modified = modified
-            end
-            if debugMode then
-                if added > 0 then
-                    SyncPrint("MERGE " .. main .. " +" .. added .. " alts")
-                else
-                    local stored = table.concat(group.alts, ", ")
-                    SyncPrint("SKIP (alt exists) " .. main .. " incoming=[" .. EscapeMsg(table.concat(alts, ", ")) .. "] stored=[" .. EscapeMsg(stored) .. "]")
-                end
-            end
-            return
+    local chars = data.chars
+    local existing = chars[charName]
+    local mod = tonumber(modified) or 0
+
+    if not existing or mod > (existing.modified or 0) then
+        local joinDate = (joinDateRaw == "U") and false or (tonumber(joinDateRaw) or false)
+        -- Preserve lastSeen from existing (it's local-only, not synced)
+        local lastSeen = existing and existing.lastSeen
+        -- Keep oldest joinDate
+        if existing and existing.joinDate and joinDate and joinDate > existing.joinDate then
+            joinDate = existing.joinDate
+        end
+        chars[charName] = {
+            main     = main,
+            nick     = (nick ~= "" and nick ~= "nil") and nick or nil,
+            joinDate = joinDate,
+            lastSeen = lastSeen,
+            roles    = (roles ~= "" and roles ~= "nil") and roles or "000",
+            modified = mod,
+        }
+        if debugMode then SyncPrint("MERGE " .. charName .. " → " .. main) end
+    elseif debugMode then
+        SyncPrint("SKIP " .. charName .. " (local newer: " .. (existing.modified or 0) .. " >= " .. mod .. ")")
+    end
+end
+
+-- ---------------------------------------------------------------------------------
+-- Build outgoing SYNC messages for chars modified since sinceTimestamp.
+-- Batches chars into messages up to 250 chars each.
+-- Returns the number of chars enqueued, or 0 if nothing to send.
+
+local function EnqueueDelta(sinceTimestamp, target)
+    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return 0 end
+    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not data or not data.chars then return 0 end
+
+    local pending = {}
+    for charName, c in pairs(data.chars) do
+        if (c.modified or 0) > sinceTimestamp then
+            -- Format: charName~mainName~nick~joinDate~roles~modified
+            local nick     = c.nick or ""
+            local joinDate = c.joinDate and tostring(c.joinDate) or "U"
+            local roles    = c.roles or "000"
+            table.insert(pending, charName .. "~" .. c.main .. "~" .. nick
+                .. "~" .. joinDate .. "~" .. roles .. "~" .. (c.modified or 0))
         end
     end
-    if debugMode then
-        SyncPrint("MERGE (new) " .. main .. " alts=" .. #alts)
+
+    if #pending == 0 then return 0 end
+
+    -- Batch: prefix SYNC|v2| then pipe-separated char records up to 250 chars each.
+    local header = "SYNC|v2|"
+    local batch, batchLen = {}, #header
+    for _, rec in ipairs(pending) do
+        local recLen = #rec + 1  -- +1 for the pipe separator
+        if batchLen + recLen > 250 and #batch > 0 then
+            Enqueue(header .. table.concat(batch, "|"), target)
+            batch, batchLen = {}, #header
+        end
+        table.insert(batch, rec)
+        batchLen = batchLen + recLen
     end
-    table.insert(data.altGroups, { main = main, alts = alts, modified = modified })
+    if #batch > 0 then Enqueue(header .. table.concat(batch, "|"), target) end
+    Enqueue("SYNC_END|v2", target)
+
+    if debugMode then
+        SyncPrint("Delta enqueued " .. #pending .. " chars (since=" .. sinceTimestamp
+            .. (target and ", target=" .. target or "") .. ")")
+    end
+    return #pending
 end
+
+-- ---------------------------------------------------------------------------------
+-- Public broadcast functions.
+
+function addon.MI_GuildSync_BroadcastHello()
+    if not addon.MI_Guild_guildName then return end
+    if not addon.db.guild_sync_enabled then return end
+    local msg = "HELLO|v2|" .. GetMyRankIndex() .. "|" .. GetDataHash() .. "|" .. GetMaxModified()
+    C_ChatInfo.SendAddonMessage(SYNC_PREFIX, msg, "GUILD")
+    if debugMode then SyncPrint("HELLO sent rank=" .. GetMyRankIndex()) end
+end
+
+-- Full broadcast: sends ALL chars. Only the leader should call this.
+function addon.MI_GuildSync_Broadcast()
+    if InCombatLockdown() then return end
+    if not addon.MI_Guild_guildName then return end
+    if not addon.db.guild_sync_enabled then return end
+    if not addon.MI_GuildSync_IsLeader() then return end
+    local count = EnqueueDelta(0, nil)
+    if count > 0 then
+        lastBroadcastTimestamp = time()
+        if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
+    end
+    return count
+end
+
+-- Delta broadcast toward a specific peer via whisper.
+-- sinceTimestamp: send all chars with modified > sinceTimestamp.
+function addon.MI_GuildSync_BroadcastDelta(sinceTimestamp, target)
+    if InCombatLockdown() then return end
+    if not addon.MI_Guild_guildName then return end
+    if not addon.db.guild_sync_enabled then return end
+    if not addon.MI_GuildSync_IsLeader() then return end
+    local count = EnqueueDelta(sinceTimestamp or 0, target)
+    if count > 0 then
+        if not target then lastBroadcastTimestamp = time() end
+        if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
+    end
+    return count
+end
+
+-- ---------------------------------------------------------------------------------
+-- Incoming message handler.
 
 local syncFrame = CreateFrame("Frame")
-local lastHelloTime = 0
 
 local function OnAddonMessage(_, event, prefix, msg, channel, sender)
     if prefix ~= SYNC_PREFIX then return end
-    if channel ~= "GUILD" then return end
-    if StripRealm(sender) == UnitName("player") then return end
+    if channel ~= "GUILD" and channel ~= "WHISPER" then return end
+    local senderBare = StripRealm(sender)
+    if senderBare == UnitName("player") then return end
 
     if debugMode then
-        SyncPrint("RECV from " .. (sender or "?") .. " len=" .. #msg
-            .. "  " .. EscapeMsg(msg:sub(1, 60)))
+        SyncPrint("RECV " .. channel .. " from " .. (sender or "?")
+            .. "  " .. EscapeMsg(msg:sub(1, 80)))
     end
 
-    -- HELLO: lightweight hash announce. Compare to our hash, record peer status.
-    local helloHash = msg:match("^HELLO|v1|(%d+)$")
-    if helloHash then
-        local bare = StripRealm(sender)
-        local myHash = GetDataHash()
-        addon.MI_GuildSync_peerStatus[bare] = (tonumber(helloHash) == myHash) and "ok" or "diff"
+    -- HELLO|v2|rankIndex|dataHash|maxModified
+    local rankStr, hash, maxModStr = msg:match("^HELLO|v2|(%d+)|([^|]+)|(%d+)$")
+    if rankStr then
+        peerInfo[senderBare] = {
+            rank        = tonumber(rankStr) or 999,
+            maxModified = tonumber(maxModStr) or 0,
+            lastHello   = time(),
+            hash        = hash,
+        }
         if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
-        -- Respond with our hash so the sender can see our status too (throttled).
-        if addon.MI_Guild_guildName and addon.db.guild_sync_enabled and time() - lastHelloTime > 60 then
-            C_ChatInfo.SendAddonMessage(SYNC_PREFIX, "HELLO|v1|" .. myHash, "GUILD")
-            lastHelloTime = time()
-        end
         return
     end
 
-    if msg:sub(1, 8) == "SYNC_END" then
+    -- SYNC_END|v2
+    if msg == "SYNC_END|v2" then
         addon.MI_Guild_RebuildIndex()
         if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
         return
     end
 
-    -- Format: SYNC|v1|main|alt1,alt2,...|modified
-    local ver, main, altsStr, modifiedStr = msg:match("^SYNC|([^|]+)|([^|]+)|([^|]*)|(%d+)$")
-    if not main or ver ~= "v1" then return end
-
-    local alts = {}
-    if altsStr ~= "" then
-        for alt in altsStr:gmatch("[^,]+") do
-            table.insert(alts, alt)
+    -- SYNC|v2|rec1|rec2|...  (only accept from current leader)
+    local body = msg:match("^SYNC|v2|(.+)$")
+    if body then
+        local currentLeader = GetLeaderName()
+        if senderBare ~= currentLeader then
+            if debugMode then SyncPrint("IGNORED (not leader): " .. senderBare .. " vs " .. currentLeader) end
+            return
         end
+        for rec in body:gmatch("[^|]+") do
+            -- Format: charName~mainName~nick~joinDate~roles~modified
+            local charName, main, nick, joinDate, roles, modified =
+                rec:match("^([^~]+)~([^~]+)~([^~]*)~([^~]+)~([^~]+)~(%d+)$")
+            if charName then
+                MergeChar(charName, main, nick, joinDate, roles, modified)
+            end
+        end
+        return
     end
-    MergeGroup(main, alts, tonumber(modifiedStr) or 0)
-    addon.MI_GuildSync_lastReceive = time()
+
+    -- Legacy v1 HELLO (ignore gracefully)
+    -- Legacy v1 SYNC (ignore; v1 data is incompatible with v2 schema)
 end
 
 syncFrame:SetScript("OnEvent", OnAddonMessage)
 
-local function LocalPlayerCanSend()
-    local rankIdx = GetSenderRankIndex(UnitName("player"))
-    return rankIdx ~= nil and rankIdx <= syncRankThreshold
-end
+-- ---------------------------------------------------------------------------------
+-- Exported peer status (read by GuildPanel for the sync status UI).
 
-function addon.MI_GuildSync_BroadcastHello()
-    if not addon.MI_Guild_guildName then return end
-    if not addon.db.guild_sync_enabled then return end
-    C_ChatInfo.SendAddonMessage(SYNC_PREFIX, "HELLO|v1|" .. GetDataHash(), "GUILD")
-    lastHelloTime = time()
-end
-
-function addon.MI_GuildSync_Broadcast()
-    if InCombatLockdown() then return end
-    if not addon.MI_Guild_guildName then return end
-    if not addon.db.guild_sync_enabled then return end
-    if not LocalPlayerCanSend() then return end
-
-    local groups = addon.MI_Guild_GetAllGroups()
-    for _, g in ipairs(groups) do
-        if #g.alts == 0 then
-            table.insert(sendQueue, string.format("SYNC|v1|%s||%d", g.main, g.modified))
-        else
-            for _, alt in ipairs(g.alts) do
-                table.insert(sendQueue, string.format("SYNC|v1|%s|%s|%d", g.main, alt, g.modified))
+-- Returns a table of { name, rank, status, maxModified } for all known peers.
+-- status: "synced" | "stale" | "unknown"
+function addon.MI_GuildSync_GetPeerStatuses()
+    PruneExpiredPeers()
+    local myMax = GetMaxModified()
+    local result = {}
+    for bareName, info in pairs(peerInfo) do
+        local status = "unknown"
+        if info.maxModified then
+            status = (info.maxModified >= myMax) and "synced" or "stale"
+        end
+        -- Look up rank name from roster
+        local rankName = ""
+        for i = 1, GetNumGuildMembers() do
+            local n, rn, ri = GetGuildRosterInfo(i)
+            if n and StripRealm(n) == bareName then
+                rankName = rn or ""
+                break
             end
         end
+        table.insert(result, {
+            name        = bareName,
+            rank        = info.rank or 999,
+            rankName    = rankName,
+            maxModified = info.maxModified or 0,
+            status      = status,
+        })
     end
-    table.insert(sendQueue, "SYNC_END|v1")
-
-    addon.MI_GuildSync_lastBroadcast = time()
-
-    if debugMode then
-        SyncPrint("Broadcasting " .. #groups .. " group(s) — queue=" .. #sendQueue)
-    end
-
-    if not sendTicker then
-        sendTicker = C_Timer.NewTicker(0.25, FlushQueue)
-    end
-    return #groups
+    table.sort(result, function(a, b) return (a.rank ~= b.rank) and a.rank < b.rank or a.name < b.name end)
+    return result
 end
+
+function addon.MI_GuildSync_GetMyMaxModified()
+    return GetMaxModified()
+end
+
+-- ---------------------------------------------------------------------------------
 
 function addon.MI_GuildSync_Init()
     C_ChatInfo.RegisterAddonMessagePrefix(SYNC_PREFIX)
@@ -225,16 +365,16 @@ function addon.MI_GuildSync_Init()
 
     local f = CreateFrame("Frame")
     f:RegisterEvent("PLAYER_ENTERING_WORLD")
-    f:RegisterEvent("GUILD_ROSTER_UPDATE")
     f:SetScript("OnEvent", function(self, event, isLogin, isReload)
-        if event == "GUILD_ROSTER_UPDATE" then
-            RefreshSyncRankThreshold()
-        elseif event == "PLAYER_ENTERING_WORLD" then
+        if event == "PLAYER_ENTERING_WORLD" then
             self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-            RefreshSyncRankThreshold()
             if isLogin and not isReload then
                 C_Timer.After(15, addon.MI_GuildSync_BroadcastHello)
-                C_Timer.After(60, addon.MI_GuildSync_Broadcast)
+                C_Timer.After(60, function()
+                    if addon.MI_GuildSync_IsLeader() then
+                        addon.MI_GuildSync_Broadcast()
+                    end
+                end)
             end
         end
     end)
