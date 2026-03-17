@@ -24,28 +24,26 @@ local function ProcessRosterUpdate()
     if not addon.MI_Guild_guildName then return end
 
     local newSnapshot = {}
-    local now = time()
     for i = 1, GetNumGuildMembers() do
-        local name, rankName, rankIndex, _, _, _, _, _, online = GetGuildRosterInfo(i)
+        local name, rankName, rankIndex = GetGuildRosterInfo(i)
         if name then
+            -- Use full name (with realm when cross-realm) so same-name cross-realm
+            -- members are tracked distinctly.
             newSnapshot[name] = { rankIndex = rankIndex, rankName = rankName }
-            if online then addon.MI_Guild_SetLastSeen(name, now) end
         end
     end
 
     if firstLoad then
         firstLoad = false
         prevSnapshot = newSnapshot
-        for name in pairs(newSnapshot) do
-            addon.MI_Guild_RecordJoinDate(name, now)
-        end
         return
     end
 
+    local now = time()
     for name in pairs(newSnapshot) do
         if not prevSnapshot[name] then
             AppendLog({ t = now, type = "JOIN", name = name })
-            addon.MI_Guild_RecordJoinDate(name, now)
+            if addon.MI_Guild_OnMemberJoin then addon.MI_Guild_OnMemberJoin(name) end
         end
     end
     for name, oldInfo in pairs(prevSnapshot) do
@@ -80,3 +78,4 @@ end
 function addon.MI_GuildLog_GetEntries()
     return GetLog() or {}
 end
+

@@ -274,11 +274,6 @@ frame:SetScript("OnEvent", function(self, event, name)
             "Broadcasts your alt group data to guild members who also have MysteriousQoL installed. Auto-syncs 30 seconds after login. Trusted rank is set via ^#MQoL:N#^ in Guild Info (default: rank 1 and above).")
 
 
-        UI.Header("Inactivity")
-        UI.Slider("guild_inactive_days", "Inactivity Threshold (days)",
-            7, 365, 7,
-            "Members not seen within this many days are flagged as inactive in the Guild Manager.")
-
         UI.Header("Log")
         UI.Checkbox("guild_log_enabled", "Activity Log",
             "Records guild joins, leaves, and rank changes.",
