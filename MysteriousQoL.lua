@@ -179,6 +179,11 @@ frame:SetScript("OnEvent", function(self, event, name)
         UI.Checkbox("combat_repairReminder_enabled", "Repair Reminder",
             "Shows a center-screen warning when any equipped gear drops to 50% durability (yellow).",
             refreshReminders)
+
+        UI.Header("Hungering Presence")
+        UI.Checkbox("combat_diveReminder_enabled", "Dive Reminder",
+            "Shows a large DIVE warning while skyriding when debuff 1251978 is active.",
+            refreshReminders)
     end)
 
     -- ─── FUN ───────────────────────────────────────────────────────────────

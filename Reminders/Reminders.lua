@@ -13,6 +13,7 @@ local function updateReminders()
     addon.MI_PetReminder_Update()
     addon.MI_DeathReminder_Update()
     addon.MI_RepairReminder_Update()
+    addon.MI_DiveReminder_Update()
 end
 
 -- Throttled wrapper -coalesces rapid event fires (e.g. UNIT_AURA spam in raids)
@@ -83,6 +84,7 @@ local function AnyReminderEnabled()
         or db.combat_deathReleaseProtection
         or db.combat_overloadReminder_enabled
         or db.combat_repairReminder_enabled
+        or db.combat_diveReminder_enabled
 end
 
 -- ── Lifecycle ──────────────────────────────────────────────────────────────────

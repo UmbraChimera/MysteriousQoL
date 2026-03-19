@@ -26,7 +26,7 @@ end
 local function anyoneMissingBuff(spellID, spellName)
     if not C_UnitAuras.GetPlayerAuraBySpellID(spellID) then return true end
     local numMembers = GetNumGroupMembers()
-    if numMembers > 0 then
+    if numMembers > 0 and IsInInstance() then
         local inRaid = IsInRaid()
         for i = 1, numMembers do
             local unit = inRaid and ("raid" .. i) or ("party" .. i)

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.3
+- Added **Dive Reminder** - shows a large bouncing DIVE warning while skyriding when the Hungering Presence debuff is active.
+- **Class Buff Reminder** now only checks group members for missing buffs when inside an instance.
+
 ## 1.1.2
 - Better minimap icon
 
