@@ -44,6 +44,7 @@ Guild/GuildCore.lua
 Guild/GuildChat.lua
 Guild/GuildSync.lua
 Guild/GuildLog.lua
+Guild/GuildImportExport.lua
 Guild/GuildPanel.lua
 Guild/GuildCommunities.lua
 

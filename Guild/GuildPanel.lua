@@ -1,6 +1,7 @@
 local _, addon = ...
 
-local FONT    = "Fonts\\FRIZQT__.TTF"
+local FONT      = "Fonts\\FRIZQT__.TTF"
+local FONT_HDR  = "Interface\\AddOns\\MysteriousQoL\\Fonts\\DejaVuLGCSans.ttf"
 local BAR_TEX = [[Interface\Buttons\WHITE8x8]]
 
 local PW, PH   = 680, 540
@@ -36,7 +37,6 @@ local logEdit
 local rosterFilter = "all"
 local onlineOnly   = false
 local radioAll, radioMains, radioAlts, radioUnlinked, onlineOnlyBtn
-local statsLabel   = nil
 
 local syncPopup     = nil
 local syncPopupRows = {}
@@ -47,7 +47,7 @@ local syncPopupAllBtn    = nil
 local collapsedMains = {}
 local sortKey = "name"
 local sortAsc = true
-local sortBtns = {}
+local sortHeaders = {}
 
 -- ---------------------------------------------------------------------------------
 
@@ -71,17 +71,6 @@ local function GetMemberInfo(charName)
         end
     end
     return 0, "", "", "", ""
-end
-
-local function BuildStatsText()
-    local numTotal = GetNumGuildMembers() or 0
-    local groups   = addon.MI_Guild_GetAllGroups()
-    local numMains = #groups
-    local numAlts  = 0
-    for _, g in ipairs(groups) do numAlts = numAlts + #g.alts end
-    return "|cff777777Members:|r " .. numTotal
-        .. "   |cff777777Tracked Mains:|r " .. numMains
-        .. "   |cff777777Tracked Alts:|r " .. numAlts
 end
 
 local function MakeBackdrop()
@@ -120,16 +109,30 @@ local function FormatDaysAgo(ts)
     else return days .. " days ago" end
 end
 
-local function IsInactive(lastSeen)
-    if not lastSeen then return false end
-    return (time() - lastSeen) > ((addon.db.guild_inactive_days or 30) * 86400)
-end
-
 local function GetCharData(charName)
     if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return nil end
     local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
     if not data or not data.chars then return nil end
     return data.chars[charName]
+end
+
+local function IsInactive(lastSeen, group)
+    local threshold = (addon.db.guild_inactive_days or 120) * 86400
+    local now = time()
+    local function seenRecently(ts)
+        return ts and (now - ts) <= threshold
+    end
+    if group then
+        if seenRecently(lastSeen) then return false end
+        local mainData = GetCharData(group.main)
+        if seenRecently(mainData and mainData.lastSeen) then return false end
+        for _, altName in ipairs(group.alts) do
+            local altData = GetCharData(altName)
+            if seenRecently(altData and altData.lastSeen) then return false end
+        end
+        return true
+    end
+    return not seenRecently(lastSeen)
 end
 
 local function GetOldestJoinDate(charNames)
@@ -390,7 +393,7 @@ local function BuildRosterEntries(filter)
     for i = 1, GetNumGuildMembers() do
         local name, rankName, rankIndex, level, _, _, _, _, isOnline, _, classToken = GetGuildRosterInfo(i)
         if name then
-            local mainName, group, isMain = addon.MI_Guild_GetGroupForChar(name)
+            local _, group, isMain = addon.MI_Guild_GetGroupForChar(name)
             local charData = GetCharData(name)
             local matches = lowerF == ""
                 or name:lower():find(lowerF, 1, true)
@@ -398,7 +401,7 @@ local function BuildRosterEntries(filter)
                 or (group and group.nick and group.nick:lower():find(lowerF, 1, true))
             if matches
                 and (rosterFilter == "all"
-                     or (rosterFilter == "mains"    and group and isMain)
+                     or (rosterFilter == "mains"    and group and isMain and #group.alts > 0)
                      or (rosterFilter == "alts"     and group and not isMain)
                      or (rosterFilter == "unlinked" and not group))
                 and (not onlineOnly or isOnline)
@@ -421,22 +424,17 @@ local function BuildRosterEntries(filter)
         end
     end
 
-    table.sort(entries, function(a, b)
+    table.sort(entries, function(entryA, entryB)
         if sortKey == "level" then
-            local diff = (b.level or 0) - (a.level or 0)
-            if diff ~= 0 then return sortAsc and diff > 0 or diff < 0 end
-        elseif sortKey == "lastseen" then
-            local at, bt = a.lastSeen or 0, b.lastSeen or 0
-            if at ~= bt then return sortAsc and at > bt or at < bt end
-        elseif sortKey == "joined" then
-            local aj = (a.joinDate and a.joinDate ~= false) and a.joinDate or 0
-            local bj = (b.joinDate and b.joinDate ~= false) and b.joinDate or 0
-            if aj ~= bj then return sortAsc and aj < bj or aj > bj end
+            local levelA = entryA.level or 0
+            local levelB = entryB.level or 0
+            if levelA ~= levelB then
+                if sortAsc then return levelA < levelB else return levelA > levelB end
+            end
         end
-        -- Group: mains before their alts, then alphabetical within group
-        local aKey = a.group and (a.group.main .. "\001" .. (a.isMain and "\000" or a.name)) or a.name
-        local bKey = b.group and (b.group.main .. "\001" .. (b.isMain and "\000" or b.name)) or b.name
-        return aKey < bKey
+        local nameKeyA = entryA.group and (entryA.group.main .. "\001" .. (entryA.isMain and "\000" or entryA.name)) or entryA.name
+        local nameKeyB = entryB.group and (entryB.group.main .. "\001" .. (entryB.isMain and "\000" or entryB.name)) or entryB.name
+        if sortAsc then return nameKeyA < nameKeyB else return nameKeyA > nameKeyB end
     end)
     return entries
 end
@@ -444,7 +442,7 @@ end
 -- ---------------------------------------------------------------------------------
 
 local function ShowRosterContextMenu(charName)
-    local mainName, group = addon.MI_Guild_GetGroupForChar(charName)
+    local _, group = addon.MI_Guild_GetGroupForChar(charName)
     MenuUtil.CreateContextMenu(UIParent, function(_, rootDescription)
         rootDescription:CreateTitle(charName)
         rootDescription:CreateButton("Set as Main", function()
@@ -486,10 +484,16 @@ local function GetOrCreateRosterRow(i)
     local hl = row:CreateTexture(nil, "BACKGROUND")
     hl:SetAllPoints(); hl:SetColorTexture(0.25, 0.2, 0.05, 0); row.hl = hl
 
+    -- Level column (after color bar)
+    row.levelLabel = MakeLabel(row, FONT, 9, 0.55, 0.55, 0.55)
+    row.levelLabel:SetPoint("LEFT", 4, 0)
+    row.levelLabel:SetWidth(22)
+    row.levelLabel:SetJustifyH("RIGHT")
+
     -- Collapse toggle for mains with alts
     local collapseBtn = CreateFrame("Button", nil, row)
     collapseBtn:SetSize(13, ROW_H)
-    collapseBtn:SetPoint("LEFT", 4, 0)
+    collapseBtn:SetPoint("LEFT", 27, 0)
     collapseBtn:Hide()
     local collapseLbl = collapseBtn:CreateFontString(nil, "OVERLAY")
     collapseLbl:SetFont(FONT, 9, "")
@@ -500,9 +504,10 @@ local function GetOrCreateRosterRow(i)
     row.collapseBtn = collapseBtn
 
     row.nameLabel = MakeLabel(row, FONT, 11)
-    row.nameLabel:SetPoint("LEFT", 18, 0)
-    row.nameLabel:SetPoint("RIGHT", -76, 0)
+    row.nameLabel:SetPoint("LEFT", 41, 0)
+    row.nameLabel:SetPoint("RIGHT", -110, 0)
     row.nameLabel:SetJustifyH("LEFT")
+    row.nameLabel:SetWordWrap(false)
 
     -- Role icons: tank, healer, dps
     local function MakeRoleIcon(xOff)
@@ -511,21 +516,21 @@ local function GetOrCreateRosterRow(i)
         tex:SetPoint("RIGHT", row, "RIGHT", xOff, 0)
         return tex
     end
-    row.roleIconTank = MakeRoleIcon(-60)
-    row.roleIconHeal = MakeRoleIcon(-46)
-    row.roleIconDps  = MakeRoleIcon(-32)
+    row.roleIconTank = MakeRoleIcon(-94)
+    row.roleIconHeal = MakeRoleIcon(-80)
+    row.roleIconDps  = MakeRoleIcon(-66)
 
     -- Inactive indicator
-    row.inactiveMark = MakeLabel(row, FONT, 9, 1, 0.5, 0, 1)
-    row.inactiveMark:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+    row.inactiveMark = MakeLabel(row, FONT_HDR, 9, 1, 0.5, 0, 1)
+    row.inactiveMark:SetPoint("RIGHT", row, "RIGHT", -50, 0)
     row.inactiveMark:SetWidth(14)
     row.inactiveMark:SetJustifyH("CENTER")
     row.inactiveMark:Hide()
 
-    -- Status label (M = main, - = unlinked)
-    row.statusLabel = MakeLabel(row, FONT, 10)
+    -- Status label (M = main, main name = alt)
+    row.statusLabel = MakeLabel(row, FONT, 9)
     row.statusLabel:SetPoint("RIGHT", -4, 0)
-    row.statusLabel:SetWidth(12)
+    row.statusLabel:SetWidth(64)
     row.statusLabel:SetJustifyH("RIGHT")
 
     row:EnableMouse(true)
@@ -609,7 +614,7 @@ function addon.MI_GuildPanel_UpdateDetail(name)
         return
     end
 
-    local mainName, group, isMain = addon.MI_Guild_GetGroupForChar(name)
+    local _, group, isMain = addon.MI_Guild_GetGroupForChar(name)
     local charData = GetCharData(name)
     local level, classDisplay, classToken, publicNote, officerNote = GetMemberInfo(name)
     local cc     = ClassColor(classToken)
@@ -653,7 +658,7 @@ function addon.MI_GuildPanel_UpdateDetail(name)
     end)
 
     -- Inactivity warning
-    if IsInactive(lastSeen) then
+    if IsInactive(lastSeen, group) then
         detailInactiveLabel:SetText("|cffff8800⚠ Inactive|r")
         detailInactiveLabel:Show()
     else
@@ -820,11 +825,13 @@ local function BuildRosterList()
             local cr, cg, cb = ClassColorRGB(entry.classToken)
             row.colorBar:SetColorTexture(cr, cg, cb, 0.7)
 
+            -- Level column
+            row.levelLabel:SetText(entry.level > 0 and tostring(entry.level) or "")
+
             -- Name (indented for alts)
             local cc     = ClassColor(entry.classToken)
-            local lvlStr = entry.level > 0 and ("|cff666666" .. entry.level .. "|r ") or ""
             local indent = (entry.group and not entry.isMain) and "  " or ""
-            row.nameLabel:SetText(indent .. lvlStr .. cc .. entry.name .. "|r")
+            row.nameLabel:SetText(indent .. cc .. entry.name .. "|r")
 
             -- Collapse toggle (only for mains with alts, only when name-sorted)
             local hasAlts = entry.group and #entry.group.alts > 0
@@ -852,17 +859,20 @@ local function BuildRosterList()
             else row.roleIconDps:Hide() end
 
             -- Inactive mark
-            if IsInactive(entry.lastSeen) then
+            if IsInactive(entry.lastSeen, entry.group) then
                 row.inactiveMark:SetText("⚠"); row.inactiveMark:Show()
             else
                 row.inactiveMark:Hide()
             end
 
-            -- Status: M for main, blank for alts/unlinked
-            if entry.isMain then
+            -- Status: M for mains with alts, main name for alts, blank for unlinked
+            if entry.isMain and hasAlts then
                 row.statusLabel:SetText("|cffffcc00M|r")
-            elseif not entry.group then
-                row.statusLabel:SetText("|cff2a2a2a-|r")
+            elseif not entry.isMain and entry.group then
+                local displayMain = (entry.group.nick and entry.group.nick ~= "")
+                    and entry.group.nick
+                    or (entry.group.main:match("^([^%-]+)") or entry.group.main)
+                row.statusLabel:SetText("|cff888888" .. displayMain .. "|r")
             else
                 row.statusLabel:SetText("")
             end
@@ -914,12 +924,6 @@ local function BuildLogText()
     return table.concat(lines, "\n")
 end
 
-local function FormatAgo(sec)
-    if sec < 60    then return sec .. "s ago"
-    elseif sec < 3600 then return math.floor(sec / 60) .. "m ago"
-    else                   return math.floor(sec / 3600) .. "h ago"
-    end
-end
 
 -- ---------------------------------------------------------------------------------
 -- Sync popup (new design)
@@ -1235,7 +1239,7 @@ local function BuildPanel()
         return btn
     end
 
-    local syncBtn = MakeToolbarButton("Sync...", 8, function()
+    MakeToolbarButton("Sync...", 8, function()
         BuildSyncPopup()
         if syncPopup:IsShown() then
             syncPopup:Hide()
@@ -1314,49 +1318,50 @@ local function BuildPanel()
     end)
     UpdateRosterRadios()
 
-    -- Sort bar (below radio row)
-    local sortBarY = contentTop - 22  -- y offset for sort bar
-    local listTop  = sortBarY - 20    -- roster list starts below sort bar
+    -- Column headers (clickable, sit directly above roster scroll)
+    local hdrY    = contentTop - 22
+    local listTop = hdrY - 14
 
-    local sortBarHdr = MakeLabel(panelFrame, FONT, 9, 0.40, 0.33, 0.10)
-    sortBarHdr:SetPoint("TOPLEFT", 4, sortBarY - 1)
-    sortBarHdr:SetText("SORT:")
-
-    local sortDefs = {
-        { key = "name",     label = "Name",     x = 38  },
-        { key = "level",    label = "Level",    x = 100 },
-        { key = "lastseen", label = "Last Seen", x = 150 },
-        { key = "joined",   label = "Joined",   x = 220 },
+    local colDefs = {
+        { key = "level", label = "Lvl",  x = 4,  w = 36, defaultAsc = false },
+        { key = "name",  label = "Name", x = 41, w = 88, defaultAsc = true  },
     }
 
-    local function UpdateSortBtns()
-        for _, def in ipairs(sortDefs) do
-            local btn = sortBtns[def.key]
+    local function UpdateSortHeaders()
+        for _, def in ipairs(colDefs) do
+            local btn = sortHeaders[def.key]
             if btn then
                 local arrow = (sortKey == def.key) and (sortAsc and " ▲" or " ▼") or ""
-                local col   = (sortKey == def.key) and ("|cffffcc00" .. def.label .. arrow .. "|r") or ("|cff666666" .. def.label .. "|r")
-                btn.lbl:SetText(col)
+                if sortKey == def.key then
+                    btn.lbl:SetText("|cffffcc00" .. def.label .. arrow .. "|r")
+                else
+                    btn.lbl:SetText("|cff555555" .. def.label .. "|r")
+                end
             end
         end
     end
 
-    for _, def in ipairs(sortDefs) do
+    for _, def in ipairs(colDefs) do
         local btn = CreateFrame("Button", nil, panelFrame)
-        btn:SetSize(58, 16); btn:SetPoint("TOPLEFT", def.x, sortBarY)
+        btn:SetSize(def.w, 14)
+        btn:SetPoint("TOPLEFT", def.x, hdrY)
         local lbl = btn:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT, 10, ""); lbl:SetAllPoints(); lbl:SetJustifyH("LEFT")
+        lbl:SetFont(FONT_HDR, 9, "")
+        lbl:SetAllPoints()
+        lbl:SetJustifyH("LEFT")
         btn.lbl = lbl
         btn:SetScript("OnClick", function()
             if sortKey == def.key then
                 sortAsc = not sortAsc
             else
-                sortKey = def.key; sortAsc = true
+                sortKey = def.key
+                sortAsc = def.defaultAsc
             end
-            UpdateSortBtns(); BuildRosterList(); rosterScroll:SetVerticalScroll(0)
+            UpdateSortHeaders(); BuildRosterList(); rosterScroll:SetVerticalScroll(0)
         end)
-        sortBtns[def.key] = btn
+        sortHeaders[def.key] = btn
     end
-    UpdateSortBtns()
+    UpdateSortHeaders()
 
     -- Vertical divider
     local detailHdr = MakeLabel(panelFrame, FONT, 9, 0.50, 0.42, 0.12)
@@ -1366,18 +1371,8 @@ local function BuildPanel()
     local divider = panelFrame:CreateTexture(nil, "ARTWORK")
     divider:SetWidth(1)
     divider:SetPoint("TOPLEFT",    LEFT_W + 8, listTop)
-    divider:SetPoint("BOTTOMLEFT", LEFT_W + 8, 22)
+    divider:SetPoint("BOTTOMLEFT", LEFT_W + 8, 2)
     divider:SetColorTexture(0.32, 0.26, 0.06, 0.5)
-
-    -- Stats bar
-    local statsSep = panelFrame:CreateTexture(nil, "ARTWORK")
-    statsSep:SetHeight(1)
-    statsSep:SetPoint("BOTTOMLEFT", 1, 20); statsSep:SetPoint("BOTTOMRIGHT", -1, 20)
-    statsSep:SetColorTexture(0.28, 0.22, 0.05, 0.4)
-
-    statsLabel = MakeLabel(panelFrame, FONT, 9, 0.5, 0.5, 0.5)
-    statsLabel:SetPoint("BOTTOMLEFT", 8, 6); statsLabel:SetPoint("BOTTOMRIGHT", -8, 6)
-    statsLabel:SetJustifyH("LEFT")
 
     -- Scale grip
     local grip = CreateFrame("Frame", nil, panelFrame)
@@ -1406,7 +1401,7 @@ local function BuildPanel()
     -- Left pane: roster scroll
     rosterScroll = CreateFrame("ScrollFrame", "MysteriousQoL_GuildRosterScroll", panelFrame)
     rosterScroll:SetPoint("TOPLEFT",    4, listTop)
-    rosterScroll:SetPoint("BOTTOMLEFT", 4, 22)
+    rosterScroll:SetPoint("BOTTOMLEFT", 4, 2)
     rosterScroll:SetWidth(LEFT_W)
     rosterScroll:EnableMouseWheel(true)
     rosterScroll:SetScript("OnMouseWheel", function(self, delta)
@@ -1486,9 +1481,10 @@ local function BuildPanel()
     detailRoleDpsCB  = MakeRoleCB(panelFrame, "DPS",    170)
 
     -- Inactivity warning
-    detailInactiveLabel = MakeLabel(panelFrame, FONT, 10, 1, 0.5, 0, 1)
-    detailInactiveLabel:SetPoint("TOPLEFT", rightX, listTop - 114)
-    detailInactiveLabel:SetWidth(PW - LEFT_W - 26)
+    detailInactiveLabel = MakeLabel(panelFrame, FONT_HDR, 10, 1, 0.5, 0, 1)
+    detailInactiveLabel:SetPoint("TOPRIGHT", panelFrame, "TOPRIGHT", -6, listTop)
+    detailInactiveLabel:SetWidth(80)
+    detailInactiveLabel:SetJustifyH("RIGHT")
     detailInactiveLabel:Hide()
 
     -- Linked characters section
@@ -1583,7 +1579,6 @@ function addon.MI_GuildPanel_Refresh()
     addon.MI_GuildPanel_UpdateDetail(selectedName)
     RefreshSyncPopup()
     logEdit:SetText(BuildLogText())
-    if statsLabel then statsLabel:SetText(BuildStatsText()) end
     C_Timer.After(0, function()
         local logScroll = logEdit:GetParent()
         if logScroll and logScroll.SetVerticalScroll then logScroll:SetVerticalScroll(0) end

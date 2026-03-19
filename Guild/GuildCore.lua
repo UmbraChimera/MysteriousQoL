@@ -49,47 +49,6 @@ local function PushGroupToNSRT(mainName)
     end
 end
 
--- MIGRATION: Convert old altGroups+members schema (v1) to flat chars schema (v2).
--- MARKED FOR REMOVAL after initial deployment.
-local function MigrateToV2()
-    local g = addon.MI_Guild_guildName
-    if not g then return end
-    local data = MysteriousQoLDB.guildData and MysteriousQoLDB.guildData[g]
-    if not data then return end
-    if (data.schemaVer or 1) >= 2 then return end
-
-    local chars = {}
-    local now = time()
-
-    for _, group in ipairs(data.altGroups or {}) do
-        if group.main and group.main ~= "" then
-            local mod = group.modified or now
-            local nick = (group.nick ~= nil and group.nick ~= "") and group.nick or nil
-            if not chars[group.main] then
-                chars[group.main] = { main = group.main, nick = nick, joinDate = false, lastSeen = nil, roles = "000", modified = mod }
-            end
-            for _, alt in ipairs(group.alts or {}) do
-                if alt ~= "" and not chars[alt] then
-                    chars[alt] = { main = group.main, nick = nick, joinDate = false, lastSeen = nil, roles = "000", modified = mod }
-                end
-            end
-        end
-    end
-
-    for charName, memberData in pairs(data.members or {}) do
-        if chars[charName] then
-            if memberData.joinDate then chars[charName].joinDate = memberData.joinDate end
-        else
-            chars[charName] = { main = charName, joinDate = memberData.joinDate or false, lastSeen = nil, roles = "000", modified = 0 }
-        end
-    end
-
-    data.chars    = chars
-    data.schemaVer = 2
-    data.altGroups = nil
-    data.members   = nil
-end
-
 -- Public API -----------------------------------------------------------------------
 
 -- Returns mainName if charName is an alt, nil if charName is a main or unlinked.
@@ -402,7 +361,6 @@ function addon.MI_Guild_Init()
     addon.MI_Guild_guildName = guildName
     if guildName then
         EnsureGuildData(guildName)
-        MigrateToV2()
     end
 
     addon.MI_GuildChat_Init()
@@ -428,7 +386,6 @@ function addon.MI_Guild_Init()
                 addon.MI_Guild_guildName = newGuild
                 if newGuild then
                     EnsureGuildData(newGuild)
-                    MigrateToV2()
                 end
             end
         end

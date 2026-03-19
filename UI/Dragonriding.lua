@@ -64,8 +64,9 @@ end
 local prevSpeed      = 0
 local elapsed        = 0
 local lastColorState = nil
+local isUpdating     = false
 
-local updateFrame
+local eventFrame
 local mainFrame, speedBar, speedText
 local chargeBars     = {}
 local chargeDividers = {}
@@ -192,7 +193,7 @@ local function UpdateCharges(charges, maxCharges, startTime, duration)
     end
 end
 
-local function UpdateSecondWind(charges, totalFilled)
+local function UpdateSecondWind(totalFilled)
     if not addon.db.ui_dragonriding_showSecondWind then
         for i = 1, NUM_CHARGES do
             secondWindBars[i]:SetValue(0)
@@ -200,11 +201,7 @@ local function UpdateSecondWind(charges, totalFilled)
         return
     end
     for i = 1, NUM_CHARGES do
-        if i <= totalFilled then
-            secondWindBars[i]:SetValue(1)
-        else
-            secondWindBars[i]:SetValue(0)
-        end
+        secondWindBars[i]:SetValue(i <= totalFilled and 1 or 0)
     end
 end
 
@@ -219,22 +216,17 @@ local function UpdateWhirlingSurge(startTime, duration)
     end
 end
 
-local function OnUpdate(self, dt)
-    elapsed = elapsed + dt
-    if elapsed < THROTTLE then return end
-    elapsed = 0
+local function HideAll()
+    if mainFrame then mainFrame:Hide() end
+    if surgeFrame then surgeFrame:Hide() end
+    prevSpeed      = 0
+    lastColorState = nil
+end
 
-    if not mainFrame or not speedBar then return end
+local function RunUpdate()
+    if not mainFrame then return end
 
-    if not addon.db.ui_dragonriding_enabled or not IsSkyriding() then
-        mainFrame:Hide()
-        if surgeFrame then surgeFrame:Hide() end
-        prevSpeed = 0
-        lastColorState = nil
-        return
-    end
-
-    local charges, maxCharges, startTime, duration, isThrill, isGroundSkim = GetVigorInfo()
+    local charges, maxCharges, startTime, duration, isThrill = GetVigorInfo()
 
     if addon.db.ui_dragonriding_hideGroundedFull and not IsGliding() and charges >= maxCharges then
         mainFrame:Hide()
@@ -243,16 +235,14 @@ local function OnUpdate(self, dt)
     end
 
     mainFrame:Show()
-
     UpdateSpeedBar(GetForwardSpeed())
     UpdateCharges(charges, maxCharges, startTime, duration)
     ApplyColors(isThrill)
 
     if addon.db.ui_dragonriding_showSecondWind then
-        local swCharges = GetSecondWindCharges()
-        UpdateSecondWind(charges, charges + swCharges)
+        UpdateSecondWind(charges + GetSecondWindCharges())
     else
-        UpdateSecondWind(0, 0)
+        UpdateSecondWind(0)
     end
 
     if addon.db.ui_dragonriding_showWhirlingSurge then
@@ -260,6 +250,36 @@ local function OnUpdate(self, dt)
         UpdateWhirlingSurge(sStart, sDur)
     else
         UpdateWhirlingSurge(0, 0)
+    end
+end
+
+local function OnUpdate(_, dt)
+    elapsed = elapsed + dt
+    if elapsed < THROTTLE then return end
+    elapsed = 0
+    RunUpdate()
+end
+
+local function CheckMount()
+    if addon.db.ui_dragonriding_enabled and IsSkyriding() then
+        if not isUpdating then
+            isUpdating = true
+            elapsed    = 0
+            eventFrame:SetScript("OnUpdate", OnUpdate)
+        end
+        RunUpdate()
+    else
+        isUpdating = false
+        eventFrame:SetScript("OnUpdate", nil)
+        HideAll()
+    end
+end
+
+local function OnEvent(_, event, unit)
+    if event == "PLAYER_MOUNT_DISPLAY_CHANGED" then
+        CheckMount()
+    elseif isUpdating and (event == "SPELL_UPDATE_CHARGES" or (event == "UNIT_AURA" and unit == "player")) then
+        RunUpdate()
     end
 end
 
@@ -349,35 +369,33 @@ local function BuildUI()
     surgeBorder:SetFrameLevel(surgeFrame:GetFrameLevel() + 3)
 
     UpdateLayout()
-end
 
-local function StartUpdating()
-    if updateFrame then return end
-    BuildUI()
-    updateFrame = CreateFrame("Frame")
-    updateFrame:SetScript("OnUpdate", OnUpdate)
-end
-
-local function StopUpdating()
-    if not updateFrame then return end
-    updateFrame:SetScript("OnUpdate", nil)
-    updateFrame:Hide()
-    updateFrame = nil
-    if mainFrame then mainFrame:Hide() end
-    if surgeFrame then surgeFrame:Hide() end
-    prevSpeed = 0
-    lastColorState = nil
+    eventFrame = CreateFrame("Frame")
+    eventFrame:SetScript("OnEvent", OnEvent)
 end
 
 function addon.MI_Dragonriding_Init()
     if not C_PlayerInfo or not C_PlayerInfo.GetGlidingInfo then return end
+    BuildUI()
     if addon.db.ui_dragonriding_enabled then
-        StartUpdating()
+        eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+        eventFrame:RegisterEvent("SPELL_UPDATE_CHARGES")
+        eventFrame:RegisterEvent("UNIT_AURA")
+        CheckMount()
     end
 end
 
--- Called by settings UI when the toggle changes
 function addon.MI_Dragonriding_SetEnabled(v)
     if not C_PlayerInfo or not C_PlayerInfo.GetGlidingInfo then return end
-    if v then StartUpdating() else StopUpdating() end
+    if v then
+        eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+        eventFrame:RegisterEvent("SPELL_UPDATE_CHARGES")
+        eventFrame:RegisterEvent("UNIT_AURA")
+        CheckMount()
+    else
+        eventFrame:UnregisterAllEvents()
+        isUpdating = false
+        eventFrame:SetScript("OnUpdate", nil)
+        HideAll()
+    end
 end

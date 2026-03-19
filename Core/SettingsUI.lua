@@ -756,7 +756,7 @@ end
 
 -- Called after all categories are registered (from MysteriousQoL.lua)
 function addon.MI_SettingsUI_BuildTabs()
-    local order = { "General", "UI", "Reminders", "Fun", "Guild" }
+    local order = { "General", "UI", "Reminders", "Fun", "Guild", "Guild Data" }
     -- Count valid tabs
     local validTabs = {}
     for _, name in ipairs(order) do
