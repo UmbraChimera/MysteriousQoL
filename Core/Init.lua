@@ -33,6 +33,7 @@ addon.defaults = {
     combat_deathReminder_enabled     = false,
     combat_overloadReminder_enabled  = false,
     combat_repairReminder_enabled    = false,
+    combat_diveReminder_enabled      = false,
 
     combat_deathReleaseProtection = false,
     combat_mailReminder_enabled  = false,

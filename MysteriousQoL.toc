@@ -1,7 +1,7 @@
 ## Interface: 120001
 ## Title: MysteriousQoL
 ## Notes: Mysterious quality of life improvements
-## Version: 1.1.2
+## Version: 1.2.0a
 ## SavedVariables: MysteriousQoLDB
 ## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
 
@@ -38,6 +38,7 @@ Reminders/PetReminder.lua
 Reminders/DeathReminder.lua
 Reminders/OverloadReminder.lua
 Reminders/RepairReminder.lua
+Reminders/DiveReminder.lua
 Reminders/MailReminder.lua
 Reminders/Reminders.lua
 Guild/GuildCore.lua
