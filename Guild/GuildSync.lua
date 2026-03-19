@@ -372,7 +372,15 @@ function addon.MI_GuildSync_Init()
                 C_Timer.After(15, addon.MI_GuildSync_BroadcastHello)
                 C_Timer.After(60, function()
                     if addon.MI_GuildSync_IsLeader() then
-                        addon.MI_GuildSync_Broadcast()
+                        local minPeerMax = math.huge
+                        for _, p in ipairs(addon.MI_GuildSync_GetPeerStatuses()) do
+                            if p.status == "stale" and p.maxModified < minPeerMax then
+                                minPeerMax = p.maxModified
+                            end
+                        end
+                        if minPeerMax ~= math.huge then
+                            EnqueueDelta(minPeerMax, nil)
+                        end
                     end
                 end)
             end

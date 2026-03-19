@@ -218,25 +218,35 @@ function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
     table.insert(allWidgets, { frame = frame, height = WIDGET_HEIGHT, key = key, refresh = Refresh })
 
     if children then
+        local function MarkChild()
+            local childEntry = allWidgets[#allWidgets]
+            childEntry.parentKey = key
+            childEntry.indent = PADDING_LEFT + INDENT
+            childEntry.visible = addon.db[key]
+        end
         for _, child in ipairs(children) do
             if child.type == "checkbox" then
                 addon.customUI.Checkbox(child.key, child.label, child.tooltip, child.onChange)
-                local childEntry = allWidgets[#allWidgets]
-                childEntry.parentKey = key
-                childEntry.indent = PADDING_LEFT + INDENT
-                childEntry.visible = addon.db[key]
+                MarkChild()
             elseif child.type == "dropdown" then
                 addon.customUI.Dropdown(child.key, child.label, child.options, child.tooltip, child.onChange)
-                local childEntry = allWidgets[#allWidgets]
-                childEntry.parentKey = key
-                childEntry.indent = PADDING_LEFT + INDENT
-                childEntry.visible = addon.db[key]
+                MarkChild()
             elseif child.type == "slider" then
                 addon.customUI.Slider(child.key, child.label, child.min, child.max, child.step, child.tooltip, child.onChange)
-                local childEntry = allWidgets[#allWidgets]
-                childEntry.parentKey = key
-                childEntry.indent = PADDING_LEFT + INDENT
-                childEntry.visible = addon.db[key]
+                MarkChild()
+            elseif child.type == "button" then
+                addon.customUI.Button(child.label, child.onClick)
+                MarkChild()
+            elseif child.type == "header" then
+                addon.customUI.Header(child.label)
+                -- Header inserts a spacer then the frame; mark both
+                local n = #allWidgets
+                if n >= 2 and allWidgets[n-1].spacer then
+                    allWidgets[n-1].parentKey = key
+                    allWidgets[n-1].visible   = addon.db[key]
+                end
+                allWidgets[n].parentKey = key
+                allWidgets[n].visible   = addon.db[key]
             end
         end
     end

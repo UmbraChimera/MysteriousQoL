@@ -41,12 +41,16 @@ Reminders/RepairReminder.lua
 Reminders/DiveReminder.lua
 Reminders/MailReminder.lua
 Reminders/Reminders.lua
+Guild/GuildUI.lua
 Guild/GuildCore.lua
 Guild/GuildChat.lua
 Guild/GuildSync.lua
 Guild/GuildLog.lua
 Guild/GuildImportExport.lua
 Guild/GuildPanel.lua
+Guild/GuildPanel_Roster.lua
+Guild/GuildPanel_Detail.lua
+Guild/GuildPanel_Sync.lua
 Guild/GuildCommunities.lua
 
 # Main entry point -must load last

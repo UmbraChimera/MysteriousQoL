@@ -5,8 +5,6 @@ local BAR_TEX = [[Interface\Buttons\WHITE8x8]]
 
 local GOLD_R, GOLD_G, GOLD_B    = 0.90, 0.76, 0.22
 local GOLD_BR, GOLD_BG, GOLD_BB = 0.50, 0.40, 0.09
-local RED_BR,  RED_BG,  RED_BB  = 0.55, 0.10, 0.10
-local RED_R,   RED_G,   RED_B   = 1.00, 0.40, 0.40
 
 local function MakeBackdrop()
     return { bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1,
@@ -22,7 +20,6 @@ local function StyleButton(btn, r, g, b)
 end
 
 local function StyleGoldButton(btn) StyleButton(btn, GOLD_BR, GOLD_BG, GOLD_BB) end
-local function StyleRedButton(btn)  StyleButton(btn, RED_BR,  RED_BG,  RED_BB)  end
 
 local function MakeLabel(parent, font, size, r, g, b)
     local fs = parent:CreateFontString(nil, "OVERLAY")
@@ -77,14 +74,9 @@ end
 function addon.MI_Guild_DeserializeData(str)
     if not str or str == "" then return false, "Nothing to import." end
 
-    -- Auto-detect guild.json format (top-level array)
-    if str:match("^%s*%[") then
-        return addon.MI_Guild_ParseGuildJSON(str)
-    end
-
     local version = str:match('"version"%s*:%s*(%d+)')
     if not version or tonumber(version) ~= 1 then
-        return false, "Unrecognized format. Paste a MQOL export or guild.json."
+        return false, "Unrecognized format. Paste a MQOL export."
     end
 
     local data = GetGuildData()
@@ -119,65 +111,6 @@ function addon.MI_Guild_DeserializeData(str)
     if count == 0 then return false, "No valid entries found." end
     data.chars = chars
     return true, "Imported " .. count .. " characters."
-end
-
--- ---------------------------------------------------------------------------------
--- guild.json one-time import
-
-function addon.MI_Guild_ParseGuildJSON(jsonStr)
-    if not jsonStr or jsonStr == "" then return false, "Empty input." end
-
-    local data = GetGuildData()
-    if not data then return false, "Not in a guild or data not initialized." end
-
-    local flat = jsonStr:gsub("\r", ""):gsub("\n", " ")
-    local now  = time()
-    local chars = {}
-    local count = 0
-
-    for objStr in flat:gmatch("{([^}]+)}") do
-        local name     = objStr:match('"name"%s*:%s*"([^"]+)"')
-        local dateStr  = objStr:match('"join_date"%s*:%s*"([^"]+)"')
-        local daysStr  = objStr:match('"last_online_days"%s*:%s*([%d%.]+)')
-        local altsStr  = objStr:match('"player_alts"%s*:%s*%[([^%]]*)%]')
-
-        if name then
-            local mainName = name
-            if altsStr then
-                for altFull in altsStr:gmatch('"([^"]+)"') do
-                    local stripped = altFull:match("^(.-)%(main%)$")
-                    if stripped then mainName = stripped; break end
-                end
-            end
-
-            local joinDate = false
-            if dateStr then
-                local y, m, d = dateStr:match("^(%d%d%d%d)-(%d%d?)-(%d%d?)$")
-                if y then
-                    joinDate = time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 })
-                end
-            end
-
-            local lastSeen = nil
-            if daysStr then
-                lastSeen = now - math.floor(tonumber(daysStr) * 86400)
-            end
-
-            chars[name] = {
-                main      = mainName,
-                nick      = nil,
-                joinDate  = joinDate,
-                lastSeen  = lastSeen,
-                roles     = "000",
-                modified  = now,
-            }
-            count = count + 1
-        end
-    end
-
-    if count == 0 then return false, "No characters found. Check that you pasted valid guild.json content." end
-    data.chars = chars
-    return true, "Imported " .. count .. " characters from guild.json."
 end
 
 -- ---------------------------------------------------------------------------------
@@ -311,51 +244,3 @@ function addon.MI_Guild_ImportExport_ShowImport()
     end
 end
 
--- ---------------------------------------------------------------------------------
--- guild.json one-time import popup
-
-local jsonImportPopup = nil
-
-function addon.MI_Guild_ImportExport_ShowJSONImport()
-    if not jsonImportPopup then
-        jsonImportPopup = MakePopupFrame("MysteriousQoL_JSONImportPopup", "Import from guild.json (One-Time)", 500, 390)
-
-        local warn = MakeLabel(jsonImportPopup, FONT, 10, RED_R, RED_G, RED_B)
-        warn:SetPoint("TOPLEFT", 10, -28); warn:SetWidth(480)
-        warn:SetText("WARNING: This will permanently wipe all current guild data and replace it with the imported data. This cannot be undone.")
-
-        local instr = MakeLabel(jsonImportPopup, FONT, 10, 0.7, 0.7, 0.7)
-        instr:SetPoint("TOPLEFT", 10, -54); instr:SetWidth(480)
-        instr:SetText("Paste the full contents of guild.json below.")
-
-        local editBox = MakeEditArea(jsonImportPopup, -72, 44)
-        jsonImportPopup._editBox = editBox
-
-        local statusLbl = MakeLabel(jsonImportPopup, FONT, 10, 0.7, 0.7, 0.7)
-        statusLbl:SetPoint("BOTTOMLEFT", 10, 16); statusLbl:SetWidth(310); statusLbl:SetText("")
-        jsonImportPopup._statusLbl = statusLbl
-
-        local importBtn = MakeActionButton(jsonImportPopup, "Wipe & Import", 120, -10, 14, StyleRedButton)
-        -- Override label color for red button
-        for _, region in ipairs({importBtn:GetRegions()}) do
-            if region:GetObjectType() == "FontString" then
-                region:SetTextColor(RED_R, RED_G, RED_B, 1)
-            end
-        end
-        importBtn:SetScript("OnClick", function()
-            local text = jsonImportPopup._editBox:GetText()
-            local ok, msg = addon.MI_Guild_ParseGuildJSON(text)
-            jsonImportPopup._statusLbl:SetText(msg)
-            if ok and addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
-        end)
-    end
-
-    if jsonImportPopup:IsShown() then
-        jsonImportPopup:Hide()
-    else
-        jsonImportPopup._editBox:SetText("")
-        jsonImportPopup._statusLbl:SetText("")
-        jsonImportPopup:Show()
-        jsonImportPopup._editBox:SetFocus()
-    end
-end

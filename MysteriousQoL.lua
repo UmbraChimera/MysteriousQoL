@@ -268,47 +268,30 @@ frame:SetScript("OnEvent", function(self, event, name)
     end)
 
     UI.RegisterCategory("Guild", function()
-        UI.Header("Alt Tracking")
+        UI.Header("Guild Manager")
         UI.Checkbox("guild_alts_enabled", "Enable Guild Module",
-            "Enables alt/main linking, chat labels, sync, and activity log.")
-        UI.Checkbox("guild_chat_showMain", "Show Main in Chat",
-            "When a linked alt speaks in chat, their name appears as [AltName (MainName)] in chat.")
-
-        UI.Header("Inactivity")
-        UI.Slider("guild_inactive_days", "Inactivity Threshold (days)",
-            7, 365, 7,
-            "Members not seen within this many days are flagged as inactive in the Guild Manager.")
-
-        UI.Header("Log")
-        UI.Checkbox("guild_log_enabled", "Activity Log",
-            "Records guild joins, leaves, and rank changes.",
-            nil,
+            "Enables alt/main linking, chat labels, and sync.",
+            function(v)
+                if not v and addon.MI_GuildPanel_Toggle and addon.GuildPanel and addon.GuildPanel.frame and addon.GuildPanel.frame:IsShown() then
+                    addon.GuildPanel.frame:Hide()
+                end
+            end,
             {
-                { type = "slider", key = "guild_log_maxEntries", label = "Max Log Entries",
-                  min = 50, max = 500, step = 50 },
+                { type = "button", label = "Open Guild Manager",
+                  onClick = function() if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end end },
+
+                { type = "header", label = "Features" },
+                { type = "checkbox", key = "guild_sync_enabled", label = "Sync Alt Data With Guildmates",
+                  tooltip = "Broadcasts your alt group data to guild members who also have MysteriousQoL installed. Auto-syncs 30 seconds after login. Trusted rank is set via ^#MQoL:N#^ in Guild Info (default: rank 1 and above)." },
+                { type = "checkbox", key = "guild_chat_showMain", label = "Show Alt Name in Chat",
+                  tooltip = "When a linked alt speaks in chat, their name appears as [AltName (MainName)] in chat." },
+
+                { type = "header", label = "Export / Import" },
+                { type = "button", label = "Export Guild Data",
+                  onClick = function() if addon.MI_Guild_ImportExport_ShowExport then addon.MI_Guild_ImportExport_ShowExport() end end },
+                { type = "button", label = "Import Guild Data",
+                  onClick = function() if addon.MI_Guild_ImportExport_ShowImport then addon.MI_Guild_ImportExport_ShowImport() end end },
             })
-
-        UI.Header("Management")
-        UI.Button("Open Guild Manager", function()
-            if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end
-        end)
-    end)
-
-    UI.RegisterCategory("Guild Data", function()
-        UI.Header("Sync")
-        UI.Checkbox("guild_sync_enabled", "Sync Alt Data With Guildmates",
-            "Broadcasts your alt group data to guild members who also have MysteriousQoL installed. Auto-syncs 30 seconds after login. Trusted rank is set via ^#MQoL:N#^ in Guild Info (default: rank 1 and above).")
-
-        UI.Header("Export / Import")
-        UI.Button("Export Guild Data", function()
-            if addon.MI_Guild_ImportExport_ShowExport then addon.MI_Guild_ImportExport_ShowExport() end
-        end)
-        UI.Button("Import Guild Data", function()
-            if addon.MI_Guild_ImportExport_ShowImport then addon.MI_Guild_ImportExport_ShowImport() end
-        end)
-        UI.Button("Import from guild.json (one-time)", function()
-            if addon.MI_Guild_ImportExport_ShowJSONImport then addon.MI_Guild_ImportExport_ShowJSONImport() end
-        end)
     end)
 
     -- Build sidebar tabs now that categories are registered
