@@ -90,6 +90,7 @@ function addon.MI_Guild_CreateGroup(mainName)
     local canonical = CanonicalName(mainName)
     if chars[canonical] then return nil end
     chars[canonical] = { main = canonical, joinDate = false, lastSeen = nil, roles = "000", modified = time() }
+    if addon.MI_GuildSync_BroadcastChars then addon.MI_GuildSync_BroadcastChars({canonical}) end
     return canonical
 end
 
@@ -113,6 +114,7 @@ function addon.MI_Guild_AddAlt(mainName, altName)
         modified = now,
     }
     chars[mainName].modified = now
+    if addon.MI_GuildSync_BroadcastChars then addon.MI_GuildSync_BroadcastChars({canonical, mainName}) end
 end
 
 -- Unlinks altName from mainName's group; altName becomes a solo unlinked entry.
@@ -125,6 +127,7 @@ function addon.MI_Guild_RemoveAlt(mainName, altName)
     c.main = altName
     c.modified = now
     if chars[mainName] then chars[mainName].modified = now end
+    if addon.MI_GuildSync_BroadcastChars then addon.MI_GuildSync_BroadcastChars({altName, mainName}) end
 end
 
 -- Promotes charName to main within their existing group.
@@ -144,6 +147,13 @@ function addon.MI_Guild_SetMain(charName)
     end
     chars[charName].main = charName
     chars[charName].modified = now
+    if addon.MI_GuildSync_BroadcastChars then
+        local affected = {}
+        for k, v in pairs(chars) do
+            if v.main == charName then table.insert(affected, k) end
+        end
+        if #affected > 0 then addon.MI_GuildSync_BroadcastChars(affected) end
+    end
 end
 
 -- Unlinks all members of mainName's group; each becomes a solo unlinked entry.
@@ -151,11 +161,16 @@ function addon.MI_Guild_DeleteGroup(mainName)
     local chars = GetChars()
     if not chars then return end
     local now = time()
+    local affected = {}
     for charName, c in pairs(chars) do
         if c.main == mainName then
+            table.insert(affected, charName)
             c.main = charName
             c.modified = now
         end
+    end
+    if addon.MI_GuildSync_BroadcastChars and #affected > 0 then
+        addon.MI_GuildSync_BroadcastChars(affected)
     end
 end
 
@@ -233,6 +248,13 @@ function addon.MI_Guild_LinkAltToMain(altName, mainName)
         modified = now,
     }
     chars[mainCanon].modified = now
+    if addon.MI_GuildSync_BroadcastChars then
+        local affected = {}
+        for k, c in pairs(chars) do
+            if c.modified == now then table.insert(affected, k) end
+        end
+        if #affected > 0 then addon.MI_GuildSync_BroadcastChars(affected) end
+    end
 end
 
 -- Removes charName from their group. Promotes first alt if charName was the main.
@@ -262,6 +284,13 @@ function addon.MI_Guild_UnlinkChar(charName)
         c.modified = now
         if chars[oldMain] then chars[oldMain].modified = now end
     end
+    if addon.MI_GuildSync_BroadcastChars then
+        local affected = {}
+        for k, ch in pairs(chars) do
+            if ch.modified == now then table.insert(affected, k) end
+        end
+        if #affected > 0 then addon.MI_GuildSync_BroadcastChars(affected) end
+    end
 end
 
 -- Returns display name (nick or main's bare name) for alts. Returns nil for mains / unlinked.
@@ -287,6 +316,13 @@ function addon.MI_Guild_SetNick(mainName, nick)
             c.modified = now
         end
     end
+    if addon.MI_GuildSync_BroadcastChars then
+        local affected = {}
+        for charName, c in pairs(chars) do
+            if c.modified == now then table.insert(affected, charName) end
+        end
+        if #affected > 0 then addon.MI_GuildSync_BroadcastChars(affected) end
+    end
     PushGroupToNSRT(mainName)
 end
 
@@ -300,6 +336,7 @@ function addon.MI_Guild_SetJoinDate(charName, ts)
         chars[charName].joinDate = ts or false
         chars[charName].modified = time()
     end
+    if addon.MI_GuildSync_BroadcastChars then addon.MI_GuildSync_BroadcastChars({charName}) end
 end
 
 -- Records joinDate only if the character has none (used by GuildLog on first-seen).
@@ -331,6 +368,7 @@ function addon.MI_Guild_SetRoles(charName, roles)
     if not chars[charName] then return end
     chars[charName].roles = roles or "000"
     chars[charName].modified = time()
+    if addon.MI_GuildSync_BroadcastChars then addon.MI_GuildSync_BroadcastChars({charName}) end
 end
 
 -- Returns roles bitmask string for charName, or "000" if unknown.
