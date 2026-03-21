@@ -125,34 +125,77 @@ end
 local function BuildRosterEntries(filter)
     local entries = {}
     local lowerF  = filter and filter:lower() or ""
+
+    -- Build set of current guild members for not-in-guild detection
+    local inGuild = {}
     for i = 1, GetNumGuildMembers() do
         local name, rankName, rankIndex, level, _, _, _, _, isOnline, _, classToken = GetGuildRosterInfo(i)
         if name then
-            local _, group, isMain = addon.MI_Guild_GetGroupForChar(name)
-            local charData = P.GetCharData(name)
-            local matches = lowerF == ""
-                or name:lower():find(lowerF, 1, true)
-                or (group and group.main:lower():find(lowerF, 1, true))
-                or (group and group.nick and group.nick:lower():find(lowerF, 1, true))
-            if matches
-                and (P.rosterFilter == "all"
-                     or (P.rosterFilter == "mains"    and group and isMain and #group.alts > 0)
-                     or (P.rosterFilter == "alts"     and group and not isMain)
-                     or (P.rosterFilter == "unlinked" and not group))
-                and (not P.onlineOnly or isOnline)
-            then
-                table.insert(entries, {
-                    name       = name,
-                    rank       = rankName or "",
-                    rankIdx    = rankIndex or 0,
-                    group      = group,
-                    isMain     = isMain,
-                    level      = level or 0,
-                    classToken = classToken or "",
-                    isOnline   = isOnline,
-                    lastSeen   = charData and charData.lastSeen,
-                    roles      = charData and charData.roles or "000",
-                })
+            inGuild[name] = { rankName=rankName, rankIndex=rankIndex, level=level, isOnline=isOnline, classToken=classToken }
+        end
+    end
+
+    -- Current guild members
+    for name, info in pairs(inGuild) do
+        local _, group, isMain = addon.MI_Guild_GetGroupForChar(name)
+        local charData = P.GetCharData(name)
+        local matches = lowerF == ""
+            or name:lower():find(lowerF, 1, true)
+            or (group and group.main:lower():find(lowerF, 1, true))
+            or (group and group.nick and group.nick:lower():find(lowerF, 1, true))
+        if matches
+            and (P.rosterFilter == "all"
+                 or (P.rosterFilter == "mains"    and group and isMain and #group.alts > 0)
+                 or (P.rosterFilter == "alts"     and group and not isMain)
+                 or (P.rosterFilter == "unlinked" and not group))
+            and (not P.onlineOnly or info.isOnline)
+        then
+            table.insert(entries, {
+                name       = name,
+                rank       = info.rankName or "",
+                rankIdx    = info.rankIndex or 0,
+                group      = group,
+                isMain     = isMain,
+                level      = info.level or 0,
+                classToken = info.classToken or "",
+                isOnline   = info.isOnline,
+                lastSeen   = charData and charData.lastSeen,
+                roles      = charData and charData.roles or "000",
+                notInGuild = false,
+            })
+        end
+    end
+
+    -- Former members: in DB but not in current roster (only shown when not filtering by online)
+    if not P.onlineOnly then
+        local chars = addon.MI_Guild_GetAllChars and addon.MI_Guild_GetAllChars() or {}
+        for charName, c in pairs(chars) do
+            if not inGuild[charName] then
+                local _, group, isMain = addon.MI_Guild_GetGroupForChar(charName)
+                local matches = lowerF == ""
+                    or charName:lower():find(lowerF, 1, true)
+                    or (group and group.main:lower():find(lowerF, 1, true))
+                    or (group and group.nick and group.nick:lower():find(lowerF, 1, true))
+                if matches
+                    and (P.rosterFilter == "all"
+                         or (P.rosterFilter == "mains"    and group and isMain and #group.alts > 0)
+                         or (P.rosterFilter == "alts"     and group and not isMain)
+                         or (P.rosterFilter == "unlinked" and not group))
+                then
+                    table.insert(entries, {
+                        name       = charName,
+                        rank       = "",
+                        rankIdx    = 999,
+                        group      = group,
+                        isMain     = isMain,
+                        level      = 0,
+                        classToken = "",
+                        isOnline   = false,
+                        lastSeen   = c.lastSeen,
+                        roles      = c.roles or "000",
+                        notInGuild = true,
+                    })
+                end
             end
         end
     end
@@ -253,8 +296,14 @@ function P.BuildRosterList()
                 row.roleIconDps:SetAtlas("roleicon-tiny-dps", false); row.roleIconDps:Show()
             else row.roleIconDps:Hide() end
 
-            if P.IsInactive(entry.lastSeen, entry.group) then
-                row.inactiveMark:SetText("⚠"); row.inactiveMark:Show()
+            if entry.notInGuild then
+                row.inactiveMark:SetText("|cffff4444Left|r")
+                row.inactiveMark:SetWidth(28)
+                row.inactiveMark:Show()
+            elseif P.IsInactive(entry.lastSeen, entry.group) then
+                row.inactiveMark:SetText("⚠")
+                row.inactiveMark:SetWidth(14)
+                row.inactiveMark:Show()
             else
                 row.inactiveMark:Hide()
             end

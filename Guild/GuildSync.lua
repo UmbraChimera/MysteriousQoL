@@ -52,6 +52,15 @@ local function GetMyRankIndex()
     return 999
 end
 
+-- Returns the rank index of any guild member by bare name. Returns 999 if not found.
+local function GetRankIndexOf(bareName)
+    for i = 1, GetNumGuildMembers() do
+        local name, _, rankIndex = GetGuildRosterInfo(i)
+        if name and StripRealm(name) == bareName then return rankIndex end
+    end
+    return 999
+end
+
 -- Reads #MQoL:N# from Guild Info text. Default: rank index 1 and above can sync.
 local function GetTrustedRankThreshold()
     local info = GetGuildInfoText and GetGuildInfoText() or ""
@@ -325,6 +334,7 @@ end
 local syncFrame = CreateFrame("Frame")
 
 local function OnAddonMessage(_, _, prefix, msg, channel, sender)
+    if not addon.db.guild_alts_enabled then return end
     if prefix ~= SYNC_PREFIX then return end
     if channel ~= "GUILD" and channel ~= "WHISPER" then return end
     local senderBare = StripRealm(sender)
@@ -378,7 +388,7 @@ local function OnAddonMessage(_, _, prefix, msg, channel, sender)
     local body = msg:match("^SYNC|(.+)$")
     if body then
         local senderInfo = peerInfo[senderBare]
-        local senderRank = senderInfo and senderInfo.rank or 999
+        local senderRank = senderInfo and senderInfo.rank or GetRankIndexOf(senderBare)
         if not IsTrustedRank(senderRank) then
             if debugMode then SyncPrint("IGNORED SYNC (not trusted rank): " .. senderBare) end
             return
@@ -451,23 +461,17 @@ function addon.MI_GuildSync_Init()
     C_ChatInfo.RegisterAddonMessagePrefix(SYNC_PREFIX)
     syncFrame:RegisterEvent("CHAT_MSG_ADDON")
 
-    -- Remove peers immediately when they go offline so the sync panel stays accurate.
-    local offlineFrame = CreateFrame("Frame")
-    offlineFrame:RegisterEvent("GUILD_MEMBER_OFFLINE")
-    offlineFrame:SetScript("OnEvent", function(_, _, name)
-        peerInfo[StripRealm(name)] = nil
-        if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
-    end)
-
     local f = CreateFrame("Frame")
     f:RegisterEvent("PLAYER_ENTERING_WORLD")
     f:SetScript("OnEvent", function(self, event, isLogin, isReload)
         if event == "PLAYER_ENTERING_WORLD" then
             self:UnregisterEvent("PLAYER_ENTERING_WORLD")
             if isLogin and not isReload then
-                -- Broadcast HELLO at 15s. Online peers whisper their HELLO back,
-                -- then both sides compare bucket hashes and exchange via BUCKET_REQ.
-                C_Timer.After(60, addon.MI_GuildSync_BroadcastHello)
+                C_Timer.After(60, function()
+                    if addon.db.guild_alts_enabled then
+                        addon.MI_GuildSync_BroadcastHello()
+                    end
+                end)
             end
         end
     end)

@@ -304,9 +304,9 @@ function P.UpdateDetail(name)
     end
 
     local nick = group.nick
-    d.nickLabel:SetText(nick and ("|cff666666Nick:|r " .. nick) or "|cff333333Nick: none|r")
+    d.nickLabel:SetText(nick and ("|cff666666Nickname:|r " .. nick) or "|cff333333Nickname: none|r")
     d.nickLabel:Show()
-    d.nickBtn.lbl:SetText(nick and "Edit Nick" or "Set Nick")
+    d.nickBtn.lbl:SetText(nick and "Edit Nickname" or "Set Nickname")
     d.nickBtn:SetScript("OnClick", function()
         P.ShowInputDialog("Nickname for " .. group.main .. ":", function(newNick)
             addon.MI_Guild_SetNick(group.main, newNick); addon.MI_GuildPanel_Refresh()

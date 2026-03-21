@@ -553,6 +553,17 @@ local function TryHook()
             currentName = nil
         end)
     end
+    -- Fallback: hook lazily if the detail frame wasn't available yet
+    hooksecurefunc(CommunitiesFrame, "Show", function()
+        local df = CommunitiesFrame.GuildMemberDetailFrame
+        if df and not df._mqol_hide_hooked then
+            df._mqol_hide_hooked = true
+            df:HookScript("OnHide", function()
+                if popup then popup:Hide() end
+                currentName = nil
+            end)
+        end
+    end)
     local function onTab() if popup then popup:Hide() end; currentName = nil end
     if CommunitiesFrame.RosterTab        then CommunitiesFrame.RosterTab:HookScript("OnClick", onTab) end
     if CommunitiesFrame.ChatTab          then CommunitiesFrame.ChatTab:HookScript("OnClick", onTab) end
@@ -569,6 +580,10 @@ local function TryHook()
     gmBtn:SetScript("OnClick", function()
         if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end
     end)
+    gmBtn:SetShown(addon.db.guild_alts_enabled)
+    addon.MI_GuildCommunities_SetButtonShown = function(show)
+        gmBtn:SetShown(show)
+    end
 end
 
 function addon.MI_GuildCommunities_Init()

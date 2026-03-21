@@ -6,6 +6,12 @@ local function StripRealm(name)
     return name and name:match("^([^%-]+)") or name
 end
 
+-- Collapses "Name-Realm-Realm-Realm" to "Name-Realm" (or "Name" if no realm).
+local function NormalizeName(name)
+    if not name then return name end
+    return name:match("^([^%-]+%-[^%-]+)") or name
+end
+
 -- Resolves a bare name to the full roster name (Name-Realm when cross-realm).
 -- Falls back to input if ambiguous or not found.
 local function CanonicalName(name)
@@ -343,6 +349,7 @@ end
 function addon.MI_Guild_RecordJoinDate(charName, ts)
     local chars = GetChars()
     if not chars then return end
+    charName = NormalizeName(charName)
     if not chars[charName] then
         chars[charName] = { main = charName, joinDate = ts, lastSeen = nil, roles = "000", modified = 0 }
     elseif not chars[charName].joinDate then
@@ -354,6 +361,7 @@ end
 function addon.MI_Guild_SetLastSeen(charName, ts)
     local chars = GetChars()
     if not chars then return end
+    charName = NormalizeName(charName)
     if not chars[charName] then
         chars[charName] = { main = charName, joinDate = false, lastSeen = ts, roles = "000", modified = 0 }
     else
@@ -377,6 +385,11 @@ function addon.MI_Guild_GetRoles(charName)
     if not chars or not charName then return "000" end
     local c = chars[charName]
     return c and c.roles or "000"
+end
+
+-- Returns the raw chars table (read-only use only).
+function addon.MI_Guild_GetAllChars()
+    return GetChars() or {}
 end
 
 -- No-op kept for compatibility; flat schema needs no index rebuild.

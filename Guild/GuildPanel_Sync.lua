@@ -68,7 +68,7 @@ function P.RefreshSyncPopup()
             syncBtn:SetSize(58, 15); syncBtn:SetPoint("RIGHT", -4, -1)
             GU.StyleGoldButton(syncBtn)
             local syncLbl = GU.MakeLabel(syncBtn, GU.FONT, 9, GU.GOLD_R, GU.GOLD_G, GU.GOLD_B)
-            syncLbl:SetAllPoints(); syncLbl:SetJustifyH("CENTER"); syncLbl:SetText("Sync →")
+            syncLbl:SetAllPoints(); syncLbl:SetJustifyH("CENTER"); syncLbl:SetText("Sync >>")
             row.syncBtn = syncBtn
             syncPopupRows[i] = row
         end

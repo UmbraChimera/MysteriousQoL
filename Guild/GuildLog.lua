@@ -80,3 +80,9 @@ end
 function addon.MI_GuildLog_GetEntries()
     return GetLog() or {}
 end
+
+function addon.MI_GuildLog_Clear()
+    local log = GetLog()
+    if not log then return end
+    for i = #log, 1, -1 do log[i] = nil end
+end

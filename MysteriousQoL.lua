@@ -272,7 +272,8 @@ frame:SetScript("OnEvent", function(self, event, name)
         UI.Checkbox("guild_alts_enabled", "Enable Guild Module",
             "Enables alt/main linking, chat labels, and sync.",
             function(v)
-                if not v and addon.MI_GuildPanel_Toggle and addon.GuildPanel and addon.GuildPanel.frame and addon.GuildPanel.frame:IsShown() then
+                if addon.MI_GuildCommunities_SetButtonShown then addon.MI_GuildCommunities_SetButtonShown(v) end
+                if not v and addon.GuildPanel and addon.GuildPanel.frame then
                     addon.GuildPanel.frame:Hide()
                 end
             end,

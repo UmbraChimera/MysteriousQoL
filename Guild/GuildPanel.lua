@@ -257,6 +257,17 @@ local function BuildPanel()
     local logHdr = GU.MakeLabel(P.frame, GU.FONT, 9, 0.50, 0.42, 0.12)
     logHdr:SetPoint("TOPLEFT", rightX, midSepY - 4); logHdr:SetText("ACTIVITY LOG")
 
+    local clearLogBtn = CreateFrame("Button", nil, P.frame, "BackdropTemplate")
+    clearLogBtn:SetSize(44, 14)
+    clearLogBtn:SetPoint("TOPLEFT", rightX + 76, midSepY - 3)
+    GU.StyleGoldButton(clearLogBtn)
+    local clearLogLbl = GU.MakeLabel(clearLogBtn, GU.FONT, 9, GU.GOLD_R, GU.GOLD_G, GU.GOLD_B)
+    clearLogLbl:SetAllPoints(); clearLogLbl:SetJustifyH("CENTER"); clearLogLbl:SetText("Clear")
+    clearLogBtn:SetScript("OnClick", function()
+        addon.MI_GuildLog_Clear()
+        if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
+    end)
+
     local logScroll = CreateFrame("ScrollFrame", "MysteriousQoL_GuildLogScroll", P.frame)
     logScroll:SetPoint("TOPLEFT",     rightX, midSepY - 18)
     logScroll:SetPoint("BOTTOMRIGHT", -4,     22)
@@ -305,6 +316,7 @@ function addon.MI_GuildPanel_Init()
 end
 
 function addon.MI_GuildPanel_Toggle()
+    if not addon.db.guild_alts_enabled then return end
     if not P.frame then BuildPanel() end
     if P.frame:IsShown() then
         P.frame:Hide()
