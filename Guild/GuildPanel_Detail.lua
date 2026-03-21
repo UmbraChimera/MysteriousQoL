@@ -5,7 +5,6 @@ local GU = addon.GuildUI
 
 local linkedRows = {}
 
--- ---------------------------------------------------------------------------------
 -- Input dialog with autocomplete
 
 local inputDialog, inputCallback
@@ -163,7 +162,6 @@ function P.ShowInputDialog(title, callback, noAC, prefill, allowEmpty)
     inputDialog.editBox:SetFocus()
 end
 
--- ---------------------------------------------------------------------------------
 -- Linked character row pool
 
 local function GetOrCreateLinkedRow(i)
@@ -194,7 +192,6 @@ local function GetOrCreateLinkedRow(i)
     return row
 end
 
--- ---------------------------------------------------------------------------------
 -- Detail pane updater
 
 function P.UpdateDetail(name)
@@ -364,7 +361,6 @@ function P.UpdateDetail(name)
     d.destructBtn:Show()
 end
 
--- ---------------------------------------------------------------------------------
 -- Section builder (called once from GuildPanel.lua:BuildPanel)
 
 function P.BuildDetailSection(parent, rightX, listTop)

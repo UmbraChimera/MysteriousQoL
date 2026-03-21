@@ -395,7 +395,6 @@ end
 -- No-op kept for compatibility; flat schema needs no index rebuild.
 function addon.MI_Guild_RebuildIndex() end
 
--- ---------------------------------------------------------------------------------
 
 local function EnsureGuildData(guildName)
     MysteriousQoLDB.guildData = MysteriousQoLDB.guildData or {}

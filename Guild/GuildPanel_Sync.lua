@@ -8,7 +8,6 @@ local syncPopupNoPeers  = nil
 local syncPopupLeaderLbl = nil
 local syncPopupAllBtn   = nil
 
--- ---------------------------------------------------------------------------------
 
 function P.RefreshSyncPopup()
     if not P.syncPopup or not P.syncPopup:IsShown() then return end
@@ -114,7 +113,6 @@ function P.RefreshSyncPopup()
     end
 end
 
--- ---------------------------------------------------------------------------------
 
 function P.BuildSyncPopup()
     if P.syncPopup then return end

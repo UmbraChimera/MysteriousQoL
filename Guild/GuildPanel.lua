@@ -30,7 +30,6 @@ local P = {
 }
 addon.GuildPanel = P
 
--- ---------------------------------------------------------------------------------
 -- Shared helpers (used by Roster, Detail, and Sync submodules)
 
 function P.ClassColor(classToken)
@@ -119,7 +118,6 @@ function P.ParseDateInput(s)
     return nil
 end
 
--- ---------------------------------------------------------------------------------
 -- Activity log text builder
 
 local TYPE_COLOR = {
@@ -154,7 +152,6 @@ local function BuildLogText()
     return table.concat(lines, "\n")
 end
 
--- ---------------------------------------------------------------------------------
 -- Main panel frame construction
 
 local function BuildPanel()
@@ -308,7 +305,6 @@ local function BuildPanel()
     end)
 end
 
--- ---------------------------------------------------------------------------------
 -- Public API
 
 function addon.MI_GuildPanel_Init()

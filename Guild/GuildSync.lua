@@ -114,7 +114,6 @@ function addon.MI_GuildSync_IsLeader()
     return GetLeaderName() == UnitName("player")
 end
 
--- ---------------------------------------------------------------------------------
 -- Send queue: 1 message/sec to avoid throttle failures.
 
 local function FlushQueue()
@@ -149,7 +148,6 @@ local function Enqueue(msg, target)
     end
 end
 
--- ---------------------------------------------------------------------------------
 -- Merge incoming char data using timestamp-wins conflict resolution.
 
 local function MergeChar(charName, main, nick, joinDateRaw, roles, modified)
@@ -181,7 +179,6 @@ local function MergeChar(charName, main, nick, joinDateRaw, roles, modified)
     end
 end
 
--- ---------------------------------------------------------------------------------
 -- SYNC message building helpers.
 
 local function CharRecord(charName, c)
@@ -268,7 +265,6 @@ local function EnqueueBucket(bucketIndex, target)
     end
 end
 
--- ---------------------------------------------------------------------------------
 -- Bucket hashing.
 
 local function BucketHash(bucketIndex)
@@ -294,7 +290,6 @@ local function BuildBucketHashes()
     return hashes
 end
 
--- ---------------------------------------------------------------------------------
 -- Public broadcast functions.
 
 function addon.MI_GuildSync_BroadcastHello()
@@ -328,7 +323,6 @@ function addon.MI_GuildSync_BroadcastDelta(sinceTimestamp, target)
     return count
 end
 
--- ---------------------------------------------------------------------------------
 -- Incoming message handler.
 
 local syncFrame = CreateFrame("Frame")
@@ -417,7 +411,6 @@ end
 
 syncFrame:SetScript("OnEvent", OnAddonMessage)
 
--- ---------------------------------------------------------------------------------
 -- Exported peer status (read by GuildPanel for the sync status UI).
 
 -- Returns a table of { name, rank, rankName, maxModified, status } for all known peers.
@@ -455,7 +448,6 @@ function addon.MI_GuildSync_GetMyMaxModified()
     return GetMaxModified()
 end
 
--- ---------------------------------------------------------------------------------
 
 function addon.MI_GuildSync_Init()
     C_ChatInfo.RegisterAddonMessagePrefix(SYNC_PREFIX)

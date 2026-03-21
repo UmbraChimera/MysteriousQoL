@@ -5,7 +5,6 @@ local GU = addon.GuildUI
 
 local rosterRows = {}
 
--- ---------------------------------------------------------------------------------
 -- Row pool
 
 local function GetOrCreateRosterRow(i)
@@ -91,7 +90,6 @@ local function GetOrCreateRosterRow(i)
     return row
 end
 
--- ---------------------------------------------------------------------------------
 -- Context menu
 
 function P.ShowRosterContextMenu(charName)
@@ -119,7 +117,6 @@ function P.ShowRosterContextMenu(charName)
     end)
 end
 
--- ---------------------------------------------------------------------------------
 -- Entry builder + sort
 
 local function BuildRosterEntries(filter)
@@ -214,7 +211,6 @@ local function BuildRosterEntries(filter)
     return entries
 end
 
--- ---------------------------------------------------------------------------------
 -- Roster list builder
 
 function P.BuildRosterList()
@@ -330,7 +326,6 @@ function P.BuildRosterList()
     P.rosterChild:SetHeight(math.max(yOff, 100))
 end
 
--- ---------------------------------------------------------------------------------
 -- Section builder (called once from GuildPanel.lua:BuildPanel)
 
 function P.BuildRosterSection(parent, contentTop, hdrY, listTop)

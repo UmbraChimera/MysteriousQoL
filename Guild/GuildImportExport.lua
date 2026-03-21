@@ -28,7 +28,6 @@ local function MakeLabel(parent, font, size, r, g, b)
     return fs
 end
 
--- ---------------------------------------------------------------------------------
 -- Data helpers
 
 local function GetGuildData()
@@ -37,7 +36,6 @@ local function GetGuildData()
     return MysteriousQoLDB.guildData[g]
 end
 
--- ---------------------------------------------------------------------------------
 -- Serialization (regular export / import)
 -- Format: JSON, version 1
 
@@ -113,7 +111,6 @@ function addon.MI_Guild_DeserializeData(str)
     return true, "Imported " .. count .. " characters."
 end
 
--- ---------------------------------------------------------------------------------
 -- Popup UI helpers
 
 local function MakePopupFrame(name, title, w, h)
@@ -170,7 +167,6 @@ local function MakeActionButton(parent, label, w, xOffset, yOffset, styleFn)
     return btn
 end
 
--- ---------------------------------------------------------------------------------
 -- Export popup
 
 local exportPopup = nil
@@ -205,7 +201,6 @@ function addon.MI_Guild_ImportExport_ShowExport()
     end
 end
 
--- ---------------------------------------------------------------------------------
 -- Import popup
 
 local importPopup = nil
