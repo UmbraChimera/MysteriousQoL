@@ -40,11 +40,12 @@ vendorFrame:SetScript("OnEvent", function()
 
         -- Auto Sell Greys
         if addon.db.vendor_autoSell and C_MerchantFrame.IsSellAllJunkEnabled() then
-            local total = 0
+            local total, hasGrey = 0, false
             for bag = 0, NUM_BAG_SLOTS do
                 for slot = 1, C_Container.GetContainerNumSlots(bag) do
                     local info = C_Container.GetContainerItemInfo(bag, slot)
                     if info and info.quality == Enum.ItemQuality.Poor then
+                        hasGrey = true
                         local sellPrice = select(11, C_Item.GetItemInfo(info.hyperlink))
                         if sellPrice and sellPrice > 0 then
                             total = total + sellPrice * info.stackCount
@@ -52,9 +53,11 @@ vendorFrame:SetScript("OnEvent", function()
                     end
                 end
             end
-            C_MerchantFrame.SellAllJunkItems()
-            if total > 0 then
-                print(PREFIX .. "Sold greys for " .. formatMoney(total))
+            if hasGrey then
+                C_MerchantFrame.SellAllJunkItems()
+                if total > 0 then
+                    print(PREFIX .. "Sold greys for " .. formatMoney(total))
+                end
             end
         end
     end)

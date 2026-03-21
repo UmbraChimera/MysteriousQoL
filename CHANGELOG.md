@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+- Added **Guild Manager** - track main/alt relationships for guild members, with a full roster panel, per-character detail view (join date, last seen, roles, nickname), and activity log (joins, leaves, promotions, demotions).
+  - Peer-to-peer sync via addon messages keeps data consistent across guild members running MysteriousQoL.
+  - Import/export support for sharing data outside of sync.
+  - Communities integration: displays main/alt info in community member tooltips.
+- Minimap button right-click now opens a small menu (Open Settings / Guild Manager / Hide Button) instead of hiding immediately.
+- **Skyriding Vigor Tracker** no longer runs an OnUpdate tick while not skyriding.
+
 ## 1.1.3
 - Added **Dive Reminder** - shows a large bouncing DIVE warning while skyriding when the Hungering Presence debuff is active.
 - **Class Buff Reminder** now only checks group members for missing buffs when inside an instance.

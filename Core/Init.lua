@@ -91,7 +91,7 @@ addon.defaults = {
     ui_minimapButton_angle        = 220,
 
     -- Guild
-    guild_alts_enabled          = true,
+    guild_alts_enabled          = false,
     guild_chat_showMain         = true,
     guild_log_enabled           = true,
     guild_log_maxEntries        = 200,

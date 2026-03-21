@@ -30,7 +30,7 @@
 - **Hide Social Button** - hides the Quick Join toast button near the minimap.
 - **Hide Talking Head** - hides the NPC talking head dialog frame.
 - **Hide Zone Text** - hides the zone name popup when entering a new area.
-- **Minimap Button** - toggleable minimap button. Left-click opens settings, right-click hides the button, drag to reposition.
+- **Minimap Button** - toggleable minimap button. Left-click opens settings, right-click opens a menu (settings, guild manager, hide), drag to reposition.
 - **Mouse Ring** - configurable ring around your cursor. Options: size, class color, hide center dot, only in combat, only on right-click, cast progress.
 - **Skyriding Vigor Tracker** - shows a vigor charge bar and speed display while skyriding. Options for Second Wind overlay, Whirling Surge cooldown, speed text, and auto-hide when full and grounded.
 
@@ -44,6 +44,15 @@
 - **Pet Idle Reminder** - bouncing warning when your pet is alive but not attacking while you are in combat.
 - **Release Protection** - blocks the release button in dungeons and raids. Hold Alt for 1 second to release.
 - **Repair Reminder** - bouncing warning when any equipped gear drops to 50% durability.
+
+## Guild
+
+- **Roster Panel** - view all tracked guild members with main/alt grouping, online status, class colors, join date, last seen, and inactivity flags. Filter and sort by name, rank, or join date.
+- **Alt Tracking** - link characters into main/alt groups. Set nicknames displayed for alts in the roster and tooltips.
+- **Activity Log** - records guild joins, leaves, promotions, and demotions with timestamps.
+- **Peer Sync** - automatically syncs alt/main data between guild members running MysteriousQoL via addon messages.
+- **Import / Export** - share guild data as a text string for manual transfer.
+- **Communities Integration** - shows main/alt info in community member tooltips.
 
 ## Fun
 
