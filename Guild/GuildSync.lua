@@ -13,6 +13,10 @@ local NUM_BUCKETS = #BUCKETS - 1  -- 8
 local peerInfo        = {}
 local PEER_EXPIRE_SEC = 300  -- 5 minutes without a HELLO = considered offline
 
+local function SyncAllowed()
+    return not IsInInstance()
+end
+
 local function SyncPrint(msg)
     print("|cff88ccff[GuildSync]|r " .. msg)
 end
@@ -295,6 +299,7 @@ end
 function addon.MI_GuildSync_BroadcastHello()
     if not addon.MI_Guild_guildName then return end
     if not addon.db.guild_sync_enabled then return end
+    if not SyncAllowed() then return end
     local hashes = BuildBucketHashes()
     local msg = "HELLO|" .. GetMyRankIndex() .. "|" .. GetMaxModified() .. "|" .. table.concat(hashes, "|")
     C_ChatInfo.SendAddonMessage(SYNC_PREFIX, msg, "GUILD")
@@ -306,6 +311,7 @@ function addon.MI_GuildSync_BroadcastChars(charNames)
     if not addon.db.guild_sync_enabled then return end
     if not IsTrustedRank(GetMyRankIndex()) then return end
     if InCombatLockdown() then return end
+    if not SyncAllowed() then return end
     if not charNames or #charNames == 0 then return end
     EnqueueChars(charNames, nil)
 end
@@ -316,6 +322,7 @@ function addon.MI_GuildSync_BroadcastDelta(sinceTimestamp, target)
     if not addon.MI_Guild_guildName then return end
     if not addon.db.guild_sync_enabled then return end
     if not addon.MI_GuildSync_IsLeader() then return end
+    if not SyncAllowed() then return end
     local count = EnqueueDelta(sinceTimestamp or 0, target)
     if count > 0 then
         if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end
@@ -331,6 +338,7 @@ local function OnAddonMessage(_, _, prefix, msg, channel, sender)
     if not addon.db.guild_alts_enabled then return end
     if prefix ~= SYNC_PREFIX then return end
     if channel ~= "GUILD" and channel ~= "WHISPER" then return end
+    if not SyncAllowed() then return end
     local senderBare = StripRealm(sender)
     if senderBare == UnitName("player") then return end
 
@@ -360,11 +368,14 @@ local function OnAddonMessage(_, _, prefix, msg, channel, sender)
             local reply  = "HELLO|" .. GetMyRankIndex() .. "|" .. GetMaxModified() .. "|" .. table.concat(hashes, "|")
             C_ChatInfo.SendAddonMessage(SYNC_PREFIX, reply, "WHISPER", senderBare)
         end
-        -- Compare bucket hashes and request exchange for any mismatch.
-        local myHashes = BuildBucketHashes()
-        for i = 1, NUM_BUCKETS do
-            if buckets[i] and buckets[i] ~= myHashes[i] then
-                Enqueue("BUCKET_REQ|" .. i, senderBare)
+        -- Only request bucket data from trusted-rank peers; untrusted peers can still
+        -- receive our data but we won't pull from them (avoids infinite reject loops).
+        if IsTrustedRank(peerInfo[senderBare].rank or 999) then
+            local myHashes = BuildBucketHashes()
+            for i = 1, NUM_BUCKETS do
+                if buckets[i] and buckets[i] ~= myHashes[i] then
+                    Enqueue("BUCKET_REQ|" .. i, senderBare)
+                end
             end
         end
         if addon.MI_GuildPanel_Refresh then addon.MI_GuildPanel_Refresh() end

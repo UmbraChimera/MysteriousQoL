@@ -128,6 +128,8 @@ local function BuildRosterEntries(filter)
     for i = 1, GetNumGuildMembers() do
         local name, rankName, rankIndex, level, _, _, _, _, isOnline, _, classToken = GetGuildRosterInfo(i)
         if name then
+            -- Normalize away doubled-realm suffixes (WoW API bug: "Name-Realm-Realm").
+            name = name:match("^([^%-]+%-[^%-]+)") or name
             inGuild[name] = { rankName=rankName, rankIndex=rankIndex, level=level, isOnline=isOnline, classToken=classToken }
         end
     end

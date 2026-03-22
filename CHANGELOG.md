@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0.1
+- Fixed guild roster showing characters as "Left" due to a WoW API bug that returns doubled realm suffixes (e.g. `Name-Realm-Realm`). Names are now normalized on read, and existing bad entries are pruned on load.
+- Fixed guild sync repeatedly retrying against untrusted-rank peers after their data was rejected, causing an infinite request loop.
+- Guild sync is now suppressed while inside any instance.
+
 ## 1.2.0
 - Added **Guild Manager** - track main/alt relationships for guild members, with a full roster panel, per-character detail view (join date, last seen, roles, nickname), and activity log (joins, leaves, promotions, demotions).
   - Peer-to-peer sync via addon messages keeps data consistent across guild members running MysteriousQoL.

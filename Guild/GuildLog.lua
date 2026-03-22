@@ -28,6 +28,8 @@ local function ProcessRosterUpdate()
     for i = 1, GetNumGuildMembers() do
         local name, rankName, rankIndex, _, _, _, _, _, online = GetGuildRosterInfo(i)
         if name then
+            -- Normalize away doubled-realm suffixes (WoW API bug: "Name-Realm-Realm").
+            name = name:match("^([^%-]+%-[^%-]+)") or name
             newSnapshot[name] = { rankIndex = rankIndex, rankName = rankName }
             if online then addon.MI_Guild_SetLastSeen(name, now) end
         end

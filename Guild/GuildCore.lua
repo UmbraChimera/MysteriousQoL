@@ -406,11 +406,61 @@ local function EnsureGuildData(guildName)
     data.log   = data.log   or {}
 end
 
+-- Removes doubled-realm keys like "Name-Realm-Realm" left by a WoW API bug.
+-- Merges the stale entry into the canonical "Name-Realm" entry if it already exists.
+local function PruneDoubledRealms()
+    local chars = GetChars()
+    if not chars then return end
+
+    -- First pass: fix any main fields pointing to a doubled-realm name.
+    for _, c in pairs(chars) do
+        local norm = NormalizeName(c.main)
+        if norm ~= c.main then c.main = norm end
+    end
+
+    -- Second pass: rename keys that are themselves doubled.
+    local toRename = {}
+    for charName in pairs(chars) do
+        if NormalizeName(charName) ~= charName then
+            table.insert(toRename, charName)
+        end
+    end
+    for _, badName in ipairs(toRename) do
+        local norm   = NormalizeName(badName)
+        local stale  = chars[badName]
+        stale.main   = NormalizeName(stale.main)
+        local kept   = chars[norm]
+        if kept then
+            -- Prefer whichever record was touched more recently.
+            if (stale.modified or 0) > (kept.modified or 0) then
+                stale.main = norm
+                chars[norm] = stale
+            end
+            -- Preserve joinDate if the surviving entry lacks one.
+            if not chars[norm].joinDate and stale.joinDate then
+                chars[norm].joinDate = stale.joinDate
+            end
+        else
+            stale.main = norm
+            chars[norm] = stale
+        end
+        chars[badName] = nil
+    end
+
+    -- Third pass: fix any main pointers that now reference a deleted key.
+    for charName, c in pairs(chars) do
+        if not chars[c.main] then
+            c.main = charName
+        end
+    end
+end
+
 function addon.MI_Guild_Init()
     local guildName = GetGuildInfo("player")
     addon.MI_Guild_guildName = guildName
     if guildName then
         EnsureGuildData(guildName)
+        PruneDoubledRealms()
     end
 
     addon.MI_GuildChat_Init()
