@@ -97,26 +97,23 @@ local function BuildButton()
 
     -- Background
     local bg = button:CreateTexture(nil, "BACKGROUND")
-    bg:SetSize(20, 20)
-    bg:SetPoint("TOPLEFT", 6, -5)
+    bg:SetAllPoints()
     bg:SetColorTexture(0.3, 0.3, 0.3, 1)
 
     -- Icon
     local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(20, 20)
-    icon:SetPoint("TOPLEFT", 6, -5)
+    icon:SetAllPoints()
     icon:SetTexture("Interface\\AddOns\\MysteriousQoL\\MysteriousQoL")
 
     -- Standard WoW minimap border overlay
     local border = button:CreateTexture(nil, "OVERLAY")
     border:SetSize(52, 52)
-    border:SetPoint("TOPLEFT")
+    border:SetPoint("CENTER")
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 
     -- Highlight
     local highlight = button:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetSize(20, 20)	
-    highlight:SetPoint("TOPLEFT", 6, -5)
+    highlight:SetAllPoints()
     highlight:SetColorTexture(1, 1, 1, 0.15)
 
     -- Tooltip
