@@ -5,6 +5,8 @@ local addonName, addon = ...
 
 local RADIUS = 104
 local BUTTON_SIZE = 31
+local ICON_OFFSET_X = -0.5  -- pixel nudge: positive = right, negative = left
+local ICON_OFFSET_Y = 1.5  -- pixel nudge: positive = up, negative = down
 local FONT = "Fonts\\FRIZQT__.TTF"
 local BAR_TEX = [[Interface\Buttons\WHITE8x8]]
 
@@ -97,12 +99,14 @@ local function BuildButton()
 
     -- Background
     local bg = button:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
+    bg:SetSize(20, 20)
+    bg:SetPoint("CENTER", button, "CENTER", ICON_OFFSET_X, ICON_OFFSET_Y)
     bg:SetColorTexture(0.3, 0.3, 0.3, 1)
 
     -- Icon
     local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetAllPoints()
+    icon:SetSize(20, 20)
+    icon:SetPoint("CENTER", button, "CENTER", ICON_OFFSET_X, ICON_OFFSET_Y)
     icon:SetTexture("Interface\\AddOns\\MysteriousQoL\\MysteriousQoL")
 
     -- Standard WoW minimap border overlay
