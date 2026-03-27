@@ -1,14 +1,12 @@
 local addonName, addon = ...
 
--- No-library minimap button. Draggable around the minimap ring.
--- Left-click toggles the custom settings frame.
+-- Minimap button via LibDBIcon-1.0.
+-- Left-click opens settings, right-click opens menu, draggable.
 
-local RADIUS = 104
-local BUTTON_SIZE = 31
-local FONT = "Fonts\\FRIZQT__.TTF"
+local FONT    = "Fonts\\FRIZQT__.TTF"
 local BAR_TEX = [[Interface\Buttons\WHITE8x8]]
 
-local button
+local ldbObject
 local miniMenu, menuClickCatcher
 
 local function BuildMinimapMenu()
@@ -24,7 +22,7 @@ local function BuildMinimapMenu()
     end)
 
     miniMenu = CreateFrame("Frame", "MysteriousQoL_MinimapMenu", UIParent, "BackdropTemplate")
-    miniMenu:SetSize(152, 72)
+    miniMenu:SetSize(152, 50)
     miniMenu:SetFrameStrata("FULLSCREEN_DIALOG")
     miniMenu:SetClampedToScreen(true)
     miniMenu:SetBackdrop({
@@ -56,17 +54,15 @@ local function BuildMinimapMenu()
     AddItem("Open Settings", -2, function()
         if addon.customUI and addon.customUI.Toggle then addon.customUI.Toggle() end
     end)
-    AddItem("Guild Manager", -24, function()
-        if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end
-    end)
-    AddItem("Hide Button", -46, function()
+    AddItem("Hide Button", -24, function()
         addon.db.ui_minimapButton_enabled = false
-        button:Hide()
+        addon.db.minimapIcon.hide = true
+        LibStub("LibDBIcon-1.0"):Hide("MysteriousQoL")
         print("|cff00ccccMysteriousQoL|r: Minimap button hidden. Use /mqol to re-enable it.")
     end)
 end
 
-local function ToggleMinimapMenu()
+local function ToggleMinimapMenu(button)
     if not miniMenu then BuildMinimapMenu() end
     if miniMenu:IsShown() then
         miniMenu:Hide()
@@ -79,101 +75,43 @@ local function ToggleMinimapMenu()
     end
 end
 
-local function UpdatePosition()
-    if not button then return end
-    local angle = math.rad(addon.db.ui_minimapButton_angle or 220)
-    local x = math.cos(angle) * RADIUS
-    local y = math.sin(angle) * RADIUS
-    button:ClearAllPoints()
-    button:SetPoint("CENTER", Minimap, "CENTER", x, y)
-end
-
-local function BuildButton()
-    button = CreateFrame("Button", "MysteriousQoL_MinimapButton", Minimap)
-    button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
-    button:SetFrameStrata("MEDIUM")
-    button:SetFrameLevel(8)
-    button:SetClampedToScreen(true)
-
-    -- Background
-    local bg = button:CreateTexture(nil, "BACKGROUND")
-    bg:SetSize(20, 20)
-    bg:SetPoint("TOPLEFT", 6, -5)
-    bg:SetColorTexture(0.3, 0.3, 0.3, 1)
-
-    -- Icon
-    local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(20, 20)
-    icon:SetPoint("TOPLEFT", 6, -5)
-    icon:SetTexture("Interface\\AddOns\\MysteriousQoL\\MysteriousQoL")
-
-    -- Standard WoW minimap border overlay
-    local border = button:CreateTexture(nil, "OVERLAY")
-    border:SetSize(52, 52)
-    border:SetPoint("TOPLEFT")
-    border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-
-    -- Highlight
-    local highlight = button:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetSize(20, 20)	
-    highlight:SetPoint("TOPLEFT", 6, -5)
-    highlight:SetColorTexture(1, 1, 1, 0.15)
-
-    -- Tooltip
-    button:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("|cff00ccccMysteriousQoL|r", 1, 1, 1)
-        GameTooltip:AddLine("Left-click: Open Settings", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("Right-click: Menu", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("Drag: Reposition", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    button:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
-
-    -- Click
-    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    button:SetScript("OnClick", function(_, btn)
-        if btn == "RightButton" then
-            ToggleMinimapMenu()
-            return
-        end
-        if addon.customUI and addon.customUI.Toggle then
-            addon.customUI.Toggle()
-        end
-    end)
-
-    -- Drag around minimap
-    button:RegisterForDrag("LeftButton")
-    button:SetScript("OnDragStart", function()
-        button:SetScript("OnUpdate", function()
-            local cx, cy = Minimap:GetCenter()
-            if not cx then return end
-            local mx, my = GetCursorPosition()
-            local scale = Minimap:GetEffectiveScale()
-            mx, my = mx / scale, my / scale
-            local angle = math.atan2(my - cy, mx - cx)
-            addon.db.ui_minimapButton_angle = math.deg(angle)
-            UpdatePosition()
-        end)
-    end)
-    button:SetScript("OnDragStop", function()
-        button:SetScript("OnUpdate", nil)
-    end)
-
-    UpdatePosition()
-end
-
 function addon.MI_MinimapButton_Init()
-    BuildButton()
-    if not addon.db.ui_minimapButton_enabled then
-        button:Hide()
-    end
+    local LDB     = LibStub("LibDataBroker-1.1")
+    local DBIcon  = LibStub("LibDBIcon-1.0")
+
+    -- Sync hide state from the enabled flag (covers first login after migration).
+    addon.db.minimapIcon.hide = not addon.db.ui_minimapButton_enabled
+
+    ldbObject = LDB:NewDataObject("MysteriousQoL", {
+        type = "launcher",
+        icon = "Interface\\AddOns\\MysteriousQoL\\MysteriousQoL",
+        OnClick = function(self, btn)
+            if btn == "RightButton" then
+                ToggleMinimapMenu(self)
+                return
+            end
+            if addon.customUI and addon.customUI.Toggle then
+                addon.customUI.Toggle()
+            end
+        end,
+        OnTooltipShow = function(tip)
+            tip:SetText("|cff00ccccMysteriousQoL|r", 1, 1, 1)
+            tip:AddLine("Left-click: Open Settings", 0.7, 0.7, 0.7)
+            tip:AddLine("Right-click: Menu", 0.7, 0.7, 0.7)
+            tip:AddLine("Drag: Reposition", 0.7, 0.7, 0.7)
+        end,
+    })
+
+    DBIcon:Register("MysteriousQoL", ldbObject, addon.db.minimapIcon)
 end
 
 function addon.MI_MinimapButton_SetShown(show)
-    if button then
-        button:SetShown(show)
+    local DBIcon = LibStub("LibDBIcon-1.0")
+    addon.db.ui_minimapButton_enabled = show
+    addon.db.minimapIcon.hide = not show
+    if show then
+        DBIcon:Show("MysteriousQoL")
+    else
+        DBIcon:Hide("MysteriousQoL")
     end
 end

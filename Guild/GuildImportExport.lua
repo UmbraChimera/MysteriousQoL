@@ -32,8 +32,8 @@ end
 
 local function GetGuildData()
     local g = addon.MI_Guild_guildName
-    if not g or not MysteriousQoLDB or not MysteriousQoLDB.guildData then return nil end
-    return MysteriousQoLDB.guildData[g]
+    if not g or not MysteriousQoLGuildDB then return nil end
+    return MysteriousQoLGuildDB[g]
 end
 
 -- Serialization (regular export / import)

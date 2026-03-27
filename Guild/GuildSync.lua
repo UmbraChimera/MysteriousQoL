@@ -36,8 +36,8 @@ end
 
 -- Returns the max "modified" timestamp across all chars in the current guild data.
 local function GetMaxModified()
-    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return 0 end
-    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not addon.MI_Guild_guildName or not MysteriousQoLGuildDB then return 0 end
+    local data = MysteriousQoLGuildDB[addon.MI_Guild_guildName]
     if not data or not data.chars then return 0 end
     local maxMod = 0
     for _, c in pairs(data.chars) do
@@ -155,8 +155,8 @@ end
 -- Merge incoming char data using timestamp-wins conflict resolution.
 
 local function MergeChar(charName, main, nick, joinDateRaw, roles, modified)
-    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return end
-    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not addon.MI_Guild_guildName or not MysteriousQoLGuildDB then return end
+    local data = MysteriousQoLGuildDB[addon.MI_Guild_guildName]
     if not data or not data.chars then return end
 
     local chars    = data.chars
@@ -210,8 +210,8 @@ end
 
 -- Enqueue all chars modified after sinceTimestamp. Returns count sent.
 local function EnqueueDelta(sinceTimestamp, target)
-    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return 0 end
-    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not addon.MI_Guild_guildName or not MysteriousQoLGuildDB then return 0 end
+    local data = MysteriousQoLGuildDB[addon.MI_Guild_guildName]
     if not data or not data.chars then return 0 end
 
     local records = {}
@@ -231,8 +231,8 @@ end
 
 -- Enqueue specific chars by name list. Used for auto-broadcast on edit.
 local function EnqueueChars(charNames, target)
-    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return end
-    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not addon.MI_Guild_guildName or not MysteriousQoLGuildDB then return end
+    local data = MysteriousQoLGuildDB[addon.MI_Guild_guildName]
     if not data or not data.chars then return end
 
     local records = {}
@@ -247,8 +247,8 @@ end
 
 -- Enqueue all chars in a bucket range.
 local function EnqueueBucket(bucketIndex, target)
-    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return end
-    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not addon.MI_Guild_guildName or not MysteriousQoLGuildDB then return end
+    local data = MysteriousQoLGuildDB[addon.MI_Guild_guildName]
     if not data or not data.chars then return end
 
     local low     = BUCKETS[bucketIndex]
@@ -272,8 +272,8 @@ end
 -- Bucket hashing.
 
 local function BucketHash(bucketIndex)
-    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return "0" end
-    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not addon.MI_Guild_guildName or not MysteriousQoLGuildDB then return "0" end
+    local data = MysteriousQoLGuildDB[addon.MI_Guild_guildName]
     if not data or not data.chars then return "0" end
     local low  = BUCKETS[bucketIndex]
     local high = BUCKETS[bucketIndex + 1]

@@ -6,8 +6,8 @@ local throttleTimer = nil
 
 local function GetLog()
     local g = addon.MI_Guild_guildName
-    if not g or not MysteriousQoLDB.guildData then return nil end
-    local data = MysteriousQoLDB.guildData[g]
+    if not g or not MysteriousQoLGuildDB then return nil end
+    local data = MysteriousQoLGuildDB[g]
     return data and data.log
 end
 

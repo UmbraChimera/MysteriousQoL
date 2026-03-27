@@ -55,8 +55,8 @@ function P.GetMemberInfo(charName)
 end
 
 function P.GetCharData(charName)
-    if not addon.MI_Guild_guildName or not MysteriousQoLDB.guildData then return nil end
-    local data = MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    if not addon.MI_Guild_guildName or not MysteriousQoLGuildDB then return nil end
+    local data = MysteriousQoLGuildDB[addon.MI_Guild_guildName]
     if not data or not data.chars then return nil end
     return data.chars[charName]
 end
@@ -80,7 +80,7 @@ end
 
 function P.GetOldestJoinDate(charNames)
     if not addon.MI_Guild_guildName then return nil end
-    local data = MysteriousQoLDB.guildData and MysteriousQoLDB.guildData[addon.MI_Guild_guildName]
+    local data = MysteriousQoLGuildDB and MysteriousQoLGuildDB[addon.MI_Guild_guildName]
     if not data or not data.chars then return nil end
     local oldest = nil
     for _, charName in ipairs(charNames) do

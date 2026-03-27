@@ -30,8 +30,8 @@ end
 
 local function GetGuildData()
     local g = addon.MI_Guild_guildName
-    if not g or not MysteriousQoLDB.guildData then return nil end
-    return MysteriousQoLDB.guildData[g]
+    if not g or not MysteriousQoLGuildDB then return nil end
+    return MysteriousQoLGuildDB[g]
 end
 
 local function GetChars()
@@ -397,11 +397,11 @@ function addon.MI_Guild_RebuildIndex() end
 
 
 local function EnsureGuildData(guildName)
-    MysteriousQoLDB.guildData = MysteriousQoLDB.guildData or {}
-    if not MysteriousQoLDB.guildData[guildName] then
-        MysteriousQoLDB.guildData[guildName] = { schemaVer = 2, chars = {}, log = {} }
+    MysteriousQoLGuildDB = MysteriousQoLGuildDB or {}
+    if not MysteriousQoLGuildDB[guildName] then
+        MysteriousQoLGuildDB[guildName] = { schemaVer = 2, chars = {}, log = {} }
     end
-    local data = MysteriousQoLDB.guildData[guildName]
+    local data = MysteriousQoLGuildDB[guildName]
     data.chars = data.chars or {}
     data.log   = data.log   or {}
 end

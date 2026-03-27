@@ -1,116 +1,114 @@
 local addonName, addon = ...
 
--- Default values for all settings. Each feature owns its own keys.
+-- Default values for all settings. Wrapped in `profile` for AceDB-3.0.
+-- Guild character data lives in MysteriousQoLGuildDB (separate SavedVariable).
 addon.defaults = {
-    -- Fun
-    fun_owenWilson_enabled = false,
-    fun_owenWilson_channel = "Master",
-    fun_batman_enabled       = false,
-    fun_batman_channel       = "Master",
-    fun_bloodlust_enabled    = false,
-    fun_bloodlust_sound      = "r2d2.ogg",
-    fun_bloodlust_channel    = "Master",
-    fun_blink_enabled        = false,
-    fun_blink_channel        = "Master",
-    fun_sneaky_enabled       = false,
-    fun_sneaky_channel       = "Master",
-    fun_rolling_enabled      = false,
-    fun_rolling_channel      = "Master",
-    fun_zoomies_enabled      = false,
-    fun_zoomies_channel      = "Master",
-    fun_zoomies_cheetah      = true,
-    fun_zoomies_dash         = true,
-    fun_zoomies_steed        = true,
-    fun_zoomies_rush         = true,
-    fun_victory_enabled      = true,
-    fun_victory_channel      = "Master",
-    fun_vendorSound_enabled  = false,
-    fun_vendorSound_channel  = "Master",
-    -- Combat
-    combat_buffReminder_enabled      = false,
-    combat_petReminder_enabled       = false,
-    combat_petIdleReminder_enabled   = false,
-    combat_deathReminder_enabled     = false,
-    combat_overloadReminder_enabled  = false,
-    combat_repairReminder_enabled    = false,
-    combat_diveReminder_enabled      = false,
-
-    combat_deathReleaseProtection = false,
-    combat_mailReminder_enabled  = false,
-
-    -- General
-    vendor_autoRepair            = false,
-    vendor_autoRepair_guildBank  = false,
-    vendor_autoSell              = false,
-    general_fasterLoot           = false,
-    general_suppressLootWarnings = false,
-    general_easyDestroy          = false,
-    general_autoKeystone         = false,
-    general_skipQueueConfirm     = false,
-    general_autoQuestAccept      = false,
-    general_autoQuestTurnIn      = false,
-    general_autoGossipSelect     = false,
-    general_ahCurrentExpansion   = false,
-    general_maxCameraDistance    = false,
-
-    -- UI > Mouse Ring
-    ui_mouseRing_enabled          = false,
-    ui_mouseRing_size             = 30,
-    ui_mouseRing_hideDot          = false,
-    ui_mouseRing_onlyInCombat     = false,
-    ui_mouseRing_onlyOnRightClick = false,
-    ui_mouseRing_useClassColor    = false,
-    ui_mouseRing_castProgress     = false,
-
-    -- UI > Hide Elements
-    ui_hideSocial_enabled         = false,
-    ui_hideAlerts_enabled         = false,
-    ui_hideTalkingHead_enabled    = false,
-    ui_hideEventToasts_enabled    = false,
-    ui_hideZoneText_enabled       = false,
-
-    -- UI > Dragonriding
-    ui_dragonriding_enabled       = false,
-    ui_dragonriding_showSpeed     = true,
-    ui_dragonriding_showSecondWind = true,
-    ui_dragonriding_showWhirlingSurge = true,
-    ui_dragonriding_hideGroundedFull  = false,
-    ui_dragonriding_barWidth      = 36,
-    ui_dragonriding_speedHeight   = 14,
-    ui_dragonriding_chargeHeight  = 14,
-    ui_dragonriding_gap           = 0,
-    ui_dragonriding_posPoint      = "BOTTOM",
-    ui_dragonriding_posX          = 0,
-    ui_dragonriding_posY          = 200,
-
-    -- UI > Chat Copy
-    ui_chatCopy_enabled           = false,
-
-    -- UI > Minimap Button
-    ui_minimapButton_enabled      = true,
-    ui_minimapButton_angle        = 220,
-
-    -- Guild
-    guild_alts_enabled          = false,
-    guild_chat_showMain         = true,
-    guild_log_enabled           = true,
-    guild_log_maxEntries        = 200,
-    guild_sync_enabled          = true,
-    guild_inactive_days         = 30,
-    guild_panel_scale           = 1.0,
-    settings_panel_scale        = 1.0,
+    profile = {
+        -- Fun
+        fun_owenWilson_enabled   = false,
+        fun_owenWilson_channel   = "Master",
+        fun_batman_enabled       = false,
+        fun_batman_channel       = "Master",
+        fun_bloodlust_enabled    = false,
+        fun_bloodlust_sound      = "r2d2.ogg",
+        fun_bloodlust_channel    = "Master",
+        fun_blink_enabled        = false,
+        fun_blink_channel        = "Master",
+        fun_sneaky_enabled       = false,
+        fun_sneaky_channel       = "Master",
+        fun_rolling_enabled      = false,
+        fun_rolling_channel      = "Master",
+        fun_zoomies_enabled      = false,
+        fun_zoomies_channel      = "Master",
+        fun_zoomies_cheetah      = true,
+        fun_zoomies_dash         = true,
+        fun_zoomies_steed        = true,
+        fun_zoomies_rush         = true,
+        fun_victory_enabled      = true,
+        fun_victory_channel      = "Master",
+        fun_vendorSound_enabled  = false,
+        fun_vendorSound_channel  = "Master",
+        -- Combat / Reminders
+        combat_buffReminder_enabled      = false,
+        combat_petReminder_enabled       = false,
+        combat_petIdleReminder_enabled   = false,
+        combat_deathReminder_enabled     = false,
+        combat_overloadReminder_enabled  = false,
+        combat_repairReminder_enabled    = false,
+        combat_diveReminder_enabled      = false,
+        combat_deathReleaseProtection    = false,
+        combat_mailReminder_enabled      = false,
+        -- General
+        vendor_autoRepair            = false,
+        vendor_autoRepair_guildBank  = false,
+        vendor_autoSell              = false,
+        general_fasterLoot           = false,
+        general_suppressLootWarnings = false,
+        general_easyDestroy          = false,
+        general_autoKeystone         = false,
+        general_skipQueueConfirm     = false,
+        general_autoQuestAccept      = false,
+        general_autoQuestTurnIn      = false,
+        general_autoGossipSelect     = false,
+        general_ahCurrentExpansion   = false,
+        general_maxCameraDistance    = false,
+        -- UI > Mouse Ring
+        ui_mouseRing_enabled          = false,
+        ui_mouseRing_size             = 30,
+        ui_mouseRing_hideDot          = false,
+        ui_mouseRing_onlyInCombat     = false,
+        ui_mouseRing_onlyOnRightClick = false,
+        ui_mouseRing_useClassColor    = false,
+        ui_mouseRing_castProgress     = false,
+        -- UI > Hide Elements
+        ui_hideSocial_enabled         = false,
+        ui_hideAlerts_enabled         = false,
+        ui_hideTalkingHead_enabled    = false,
+        ui_hideEventToasts_enabled    = false,
+        ui_hideZoneText_enabled       = false,
+        -- UI > Dragonriding
+        ui_dragonriding_enabled           = false,
+        ui_dragonriding_showSpeed         = true,
+        ui_dragonriding_showSecondWind    = true,
+        ui_dragonriding_showWhirlingSurge = true,
+        ui_dragonriding_hideGroundedFull  = false,
+        ui_dragonriding_barWidth          = 36,
+        ui_dragonriding_speedHeight       = 14,
+        ui_dragonriding_chargeHeight      = 14,
+        ui_dragonriding_gap               = 0,
+        ui_dragonriding_posPoint          = "BOTTOM",
+        ui_dragonriding_posX              = 0,
+        ui_dragonriding_posY              = 200,
+        -- UI > Chat Copy
+        ui_chatCopy_enabled          = false,
+        -- UI > Minimap Button
+        ui_minimapButton_enabled     = true,
+        minimapIcon                  = { minimapPos = 220 },
+        -- Guild (settings only; character data is in MysteriousQoLGuildDB)
+        guild_alts_enabled    = false,
+        guild_chat_showMain   = true,
+        guild_log_enabled     = true,
+        guild_log_maxEntries  = 200,
+        guild_sync_enabled    = true,
+        guild_inactive_days   = 30,
+        guild_panel_scale     = 1.0,
+        settings_panel_scale  = 1.0,
+    },
 }
 
--- Initialize the SavedVariables-backed DB, filling in any missing keys with defaults.
--- Called from ADDON_LOADED in MysteriousQoL.lua.
+-- Initialize the AceDB-3.0-backed database.
+-- self.db is aliased to rawDB.profile so all addon.db.KEY accesses in feature
+-- files work without modification.
 function addon:MI_InitDB()
-    MysteriousQoLDB = MysteriousQoLDB or {}
-    for k, v in pairs(self.defaults) do
-        if MysteriousQoLDB[k] == nil then
-            MysteriousQoLDB[k] = v
-        end
+    -- One-time migration: rescue guild data before AceDB restructures MysteriousQoLDB.
+    -- After this runs, MysteriousQoLGuildDB holds the old guildData dict keyed by guild name.
+    if MysteriousQoLDB and MysteriousQoLDB.guildData and not MysteriousQoLGuildDB then
+        MysteriousQoLGuildDB = MysteriousQoLDB.guildData
     end
-    self.db = MysteriousQoLDB
+
+    local AceDB = LibStub("AceDB-3.0")
+    self.rawDB = AceDB:New("MysteriousQoLDB", self.defaults, true)
+    self.db = self.rawDB.profile
 end
 
 -- Shared factory for bouncing reminder frames used by multiple Reminders/ modules.
