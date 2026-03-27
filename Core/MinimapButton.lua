@@ -24,7 +24,7 @@ local function BuildMinimapMenu()
     end)
 
     miniMenu = CreateFrame("Frame", "MysteriousQoL_MinimapMenu", UIParent, "BackdropTemplate")
-    miniMenu:SetSize(152, 72)
+    miniMenu:SetSize(152, 50)
     miniMenu:SetFrameStrata("FULLSCREEN_DIALOG")
     miniMenu:SetClampedToScreen(true)
     miniMenu:SetBackdrop({
@@ -56,10 +56,7 @@ local function BuildMinimapMenu()
     AddItem("Open Settings", -2, function()
         if addon.customUI and addon.customUI.Toggle then addon.customUI.Toggle() end
     end)
-    AddItem("Guild Manager", -24, function()
-        if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end
-    end)
-    AddItem("Hide Button", -46, function()
+    AddItem("Hide Button", -24, function()
         addon.db.ui_minimapButton_enabled = false
         button:Hide()
         print("|cff00ccccMysteriousQoL|r: Minimap button hidden. Use /mqol to re-enable it.")

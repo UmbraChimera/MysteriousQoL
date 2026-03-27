@@ -267,34 +267,6 @@ frame:SetScript("OnEvent", function(self, event, name)
             })
     end)
 
-    UI.RegisterCategory("Guild", function()
-        UI.Header("Guild Manager")
-        UI.Checkbox("guild_alts_enabled", "Enable Guild Module",
-            "Enables alt/main linking, chat labels, and sync.",
-            function(v)
-                if addon.MI_GuildCommunities_SetButtonShown then addon.MI_GuildCommunities_SetButtonShown(v) end
-                if not v and addon.GuildPanel and addon.GuildPanel.frame then
-                    addon.GuildPanel.frame:Hide()
-                end
-            end,
-            {
-                { type = "button", label = "Open Guild Manager",
-                  onClick = function() if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end end },
-
-                { type = "header", label = "Features" },
-                { type = "checkbox", key = "guild_sync_enabled", label = "Sync Alt Data With Guildmates",
-                  tooltip = "Broadcasts your alt group data to guild members who also have MysteriousQoL installed. Auto-syncs 30 seconds after login. Trusted rank is set via ^#MQoL:N#^ in Guild Info (default: rank 1 and above)." },
-                { type = "checkbox", key = "guild_chat_showMain", label = "Show Alt Name in Chat",
-                  tooltip = "When a linked alt speaks in chat, their name appears as [AltName (MainName)] in chat." },
-
-                { type = "header", label = "Export / Import" },
-                { type = "button", label = "Export Guild Data",
-                  onClick = function() if addon.MI_Guild_ImportExport_ShowExport then addon.MI_Guild_ImportExport_ShowExport() end end },
-                { type = "button", label = "Import Guild Data",
-                  onClick = function() if addon.MI_Guild_ImportExport_ShowImport then addon.MI_Guild_ImportExport_ShowImport() end end },
-            })
-    end)
-
     -- Build sidebar tabs now that categories are registered
     addon.MI_SettingsUI_BuildTabs()
 
@@ -305,8 +277,6 @@ frame:SetScript("OnEvent", function(self, event, name)
     addon.MI_MouseRing_Init()
     addon.MI_Dragonriding_Init()
     addon.MI_Reminders_Init()
-    addon.MI_Guild_Init()
-
     -- Apply CVars
     if addon.db.general_maxCameraDistance then
         SetCVar("cameraDistanceMaxZoomFactor", 2.6)
