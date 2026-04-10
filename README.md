@@ -37,12 +37,14 @@
 ## Reminders
 
 - **Class Buff Reminder** - pulsing icon when your class buff is missing from you or any group member. Suppressed while dead, mounted, flying, in a vehicle, or on a taxi.
+- **Cheat Death Reminder** - plays a sound when Purgatory, Cheat Death, Cauterize, or Last Resort saves you. Only active in combat inside an instance.
+- **Class Buff Reminder** - pulsing icon when your class buff is missing from you or any group member. Suppressed while dead, mounted, flying, in a vehicle, or on a taxi.
 - **Don't Release Reminder** - large bouncing warning when you die in a raid instance to prevent accidental release.
+- **Imbued Mulch Reminder** - bouncing warning when you start herbing and Imbued Mulch is in your bags and off cooldown. Never shows inside instances.
 - **Mail Reminder** - plays a sound on initial login if you have unread mail.
-- **Overload Reminder** - bouncing warning when you start mining or herbing with Overload off cooldown.
 - **No Pet Reminder** - bouncing warning when you have no active pet (Warlock, Hunter BM/Survival, Unholy DK). Detects Grimoire of Sacrifice and no-pet talents.
+- **Overload Reminder** - bouncing warning when you start mining or herbing with Overload off cooldown. Never shows inside instances.
 - **Pet Idle Reminder** - bouncing warning when your pet is alive but not attacking while you are in combat.
-- **Release Protection** - blocks the release button in dungeons and raids. Hold Alt for 1 second to release.
 - **Repair Reminder** - bouncing warning when any equipped gear drops to 50% durability.
 
 ## Guild
@@ -64,4 +66,5 @@ All fun sounds have a configurable audio channel (Master, SFX, Music, Ambience, 
 - **Owen Wilson Loot Sounds** - plays a random Owen Wilson "wow" clip when a loot window opens.
 - **Roll Sound** - plays a random sound on Roll or Chi Torpedo (Monk).
 - **Stealth Sound** - plays a sound on Stealth (Rogue) or Prowl (Druid).
+- **Vendor Sound** - plays a money sound when grey items are sold.
 - **Zoomies Sound** - plays a sound on major speed abilities: Aspect of the Cheetah, Dash, Divine Steed, Burning Rush. Individual spells toggleable.

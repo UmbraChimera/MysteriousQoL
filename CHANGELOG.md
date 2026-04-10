@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1
+- Fixed **Victory Sound** not playing due to incorrect event argument
+- Removed **Release Protection** (alt-hold blocker on the release button) - was not working correctly.
+- Removed **Shame Sound** - was not firing correctly.
+- Added **Cheat Death Reminder** - when Purgatory (Death Knight), Cheat Death (Rogue), Cauterize (Fire Mage), or Last Resort (Demon Hunter) saves you. Only active in combat inside an instance.
+- Added **Imbued Mulch Reminder** - bouncing warning when you start herbing and Imbued Mulch is in your bags and off cooldown. Never shows inside instances.
+- Fixed **Overload Reminder**
+
 ## 1.2.0.1
 - Fixed guild roster showing characters as "Left" due to a WoW API bug that returns doubled realm suffixes (e.g. `Name-Realm-Realm`). Names are now normalized on read, and existing bad entries are pruned on load.
 - Fixed guild sync repeatedly retrying against untrusted-rank peers after their data was rejected, causing an infinite request loop.
