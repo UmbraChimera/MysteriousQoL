@@ -11,7 +11,7 @@ local channelOpts = {
 
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
-frame:SetScript("OnEvent", function(self, event, name)
+frame:SetScript("OnEvent", function(self, _, name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
 
@@ -143,6 +143,9 @@ frame:SetScript("OnEvent", function(self, event, name)
         UI.Header("Death")
         UI.Checkbox("combat_deathReminder_enabled", "Don't Release Reminder",
             "Shows a large center-screen warning when you die in a raid instance to stop you releasing.",
+            refreshReminders)
+        UI.Checkbox("combat_cheatDeathReminder_enabled", "Cheat Death Reminder",
+            "Shows a warning while in combat in an instance when Purgatory, Cheat Death, or Cauterize saves you.",
             refreshReminders)
 
         UI.Header("Gathering")

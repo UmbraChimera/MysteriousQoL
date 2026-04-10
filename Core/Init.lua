@@ -30,6 +30,7 @@ addon.defaults = {
     combat_petReminder_enabled       = false,
     combat_petIdleReminder_enabled   = false,
     combat_deathReminder_enabled     = false,
+    combat_cheatDeathReminder_enabled = false,
     combat_overloadReminder_enabled  = false,
     combat_repairReminder_enabled    = false,
     combat_diveReminder_enabled      = false,

@@ -5,7 +5,7 @@ local sendQueue       = {}
 local sendTicker      = nil
 local debugMode       = false
 
--- Alphabetical bucket boundaries — 8 buckets covering A–Z.
+-- Alphabetical bucket boundaries -8 buckets covering A–Z.
 local BUCKETS     = { "", "D", "G", "J", "M", "P", "S", "V", "~" }
 local NUM_BUCKETS = #BUCKETS - 1  -- 8
 

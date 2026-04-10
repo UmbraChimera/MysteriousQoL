@@ -35,6 +35,7 @@ UI/Dragonriding.lua
 Reminders/BuffReminder.lua
 Reminders/PetReminder.lua
 Reminders/DeathReminder.lua
+Reminders/CheatDeathReminder.lua
 Reminders/OverloadReminder.lua
 Reminders/RepairReminder.lua
 Reminders/DiveReminder.lua
