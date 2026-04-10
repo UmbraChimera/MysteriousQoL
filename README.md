@@ -47,7 +47,7 @@
 - **Pet Idle Reminder** - bouncing warning when your pet is alive but not attacking while you are in combat.
 - **Repair Reminder** - bouncing warning when any equipped gear drops to 50% durability.
 
-## Guild
+## Guild - Disabled for now
 
 - **Roster Panel** - view all tracked guild members with main/alt grouping, online status, class colors, join date, last seen, and inactivity flags. Filter and sort by name, rank, or join date.
 - **Alt Tracking** - link characters into main/alt groups. Set nicknames displayed for alts in the roster and tooltips.
