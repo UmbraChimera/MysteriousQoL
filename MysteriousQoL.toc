@@ -37,6 +37,7 @@ Reminders/PetReminder.lua
 Reminders/DeathReminder.lua
 Reminders/CheatDeathReminder.lua
 Reminders/OverloadReminder.lua
+Reminders/MulchReminder.lua
 Reminders/RepairReminder.lua
 Reminders/DiveReminder.lua
 Reminders/MailReminder.lua

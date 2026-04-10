@@ -1,16 +1,13 @@
 local _, addon = ...
 
--- Shows a reminder to use Overload when you start gathering a node and the spell is off cooldown.
--- Detects mining and herb gathering casts via UNIT_SPELLCAST_START whitelist.
+-- Shows a reminder to use Overload when you start gathering and the spell is off cooldown.
+-- Never shows inside instances.
+
+local SPELL_MINING    = 471013   -- Midnight Mining
+local SPELL_HERB      = 471009   -- Herb Gathering
 
 local OVERLOAD_MINING = 1225392  -- Overload Infused Deposit
 local OVERLOAD_HERB   = 1223014  -- Overload Infused Herb
-
--- Universal gathering spell IDs (one per profession in Midnight)
-local GATHERING_SPELLS = {
-    [471013] = OVERLOAD_MINING,  -- Midnight Mining
-    [471009] = OVERLOAD_HERB,    -- Herb Gathering
-}
 
 local function isOffCooldown(spellID)
     local info = C_Spell.GetSpellCooldown(spellID)
@@ -30,10 +27,16 @@ local overloadFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_OverloadRem
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
 eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP",  "player")
-eventFrame:SetScript("OnEvent", function(self, event, unit, castGUID, spellID)
+eventFrame:SetScript("OnEvent", function(_, event, _, _, spellID)
     if event == "UNIT_SPELLCAST_START" then
         if not addon.db.combat_overloadReminder_enabled then return end
-        local overloadID = GATHERING_SPELLS[spellID]
+        if IsInInstance() then return end
+        local overloadID
+        if spellID == SPELL_HERB then
+            overloadID = OVERLOAD_HERB
+        elseif spellID == SPELL_MINING then
+            overloadID = OVERLOAD_MINING
+        end
         if overloadID and isOffCooldown(overloadID) then
             overloadFrame.ResetBounce()
             overloadFrame:Show()

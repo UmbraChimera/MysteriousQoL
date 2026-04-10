@@ -1,4 +1,4 @@
-local addonName, addon = ...
+local _, addon = ...
 
 -- Default values for all settings. Each feature owns its own keys.
 addon.defaults = {
@@ -32,6 +32,7 @@ addon.defaults = {
     combat_deathReminder_enabled     = false,
     combat_cheatDeathReminder_enabled = false,
     combat_overloadReminder_enabled  = false,
+    combat_mulchReminder_enabled     = false,
     combat_repairReminder_enabled    = false,
     combat_diveReminder_enabled      = false,
 

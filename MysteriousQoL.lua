@@ -152,6 +152,9 @@ frame:SetScript("OnEvent", function(self, _, name)
         UI.Checkbox("combat_overloadReminder_enabled", "Overload Reminder",
             "Shows a warning when you begin mining or herbing and your Overload spell is off cooldown.",
             refreshReminders)
+        UI.Checkbox("combat_mulchReminder_enabled", "Imbued Mulch Reminder",
+            "Shows a warning when you begin herbing and Imbued Mulch is in your bags and off cooldown.",
+            refreshReminders)
 
         UI.Header("Mail")
         UI.Checkbox("combat_mailReminder_enabled", "Mail Reminder",
