@@ -22,7 +22,6 @@ addon.defaults = {
     fun_zoomies_dash         = true,
     fun_zoomies_steed        = true,
     fun_zoomies_rush         = true,
-    fun_victory_enabled      = true,
     fun_victory_channel      = "Master",
     fun_vendorSound_enabled  = false,
     fun_vendorSound_channel  = "Master",
