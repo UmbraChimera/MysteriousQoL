@@ -26,7 +26,6 @@ Fun/Blink.lua
 Fun/Sneaky.lua
 Fun/Rolling.lua
 Fun/Zoomies.lua
-Fun/Shame.lua
 Fun/Victory.lua
 Fun/VendorSound.lua
 UI/MouseRing.lua

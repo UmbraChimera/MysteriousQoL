@@ -144,9 +144,6 @@ frame:SetScript("OnEvent", function(self, event, name)
         UI.Checkbox("combat_deathReminder_enabled", "Don't Release Reminder",
             "Shows a large center-screen warning when you die in a raid instance to stop you releasing.",
             refreshReminders)
-        UI.Checkbox("combat_deathReleaseProtection", "Release Protection",
-            "Blocks the release button in dungeons and raids. Hold Alt for 1 second to release.",
-            refreshReminders)
 
         UI.Header("Gathering")
         UI.Checkbox("combat_overloadReminder_enabled", "Overload Reminder",
