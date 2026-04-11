@@ -9,7 +9,6 @@ local THROTTLE             = 0.0333   -- ~30 FPS
 local MAX_SPEED            = 85       -- max forward speed for bar scaling
 local SPEED_DISPLAY_FACTOR = 14.285   -- converts raw speed to the ~0-100% display range
 local THRILL_THRESHOLD     = 6.003    -- Thrill of the Skies activates above this speed
-local GROUND_SKIM_DURATION = 8.28     -- Ground Skimming buff duration in seconds
 local BAR_TEXTURE          = [[Interface\Buttons\WHITE8x8]]
 
 local COLOR = {
@@ -27,38 +26,14 @@ local function IsSkyriding()
     return canGlide == true
 end
 
-local function IsGliding()
-    local gliding = C_PlayerInfo.GetGlidingInfo()
-    return gliding
-end
-
-local function GetForwardSpeed()
-    local _, _, spd = C_PlayerInfo.GetGlidingInfo()
-    return spd or 0
-end
-
 local function GetVigorInfo()
     local data = C_Spell.GetSpellCharges(VIGOR_SPELL)
-    if not data then return 0, 6, 0, 0, false, false end
+    if not data then return 0, 6, 0, 0, false end
     local isThrill = data.cooldownDuration > 0
         and data.cooldownDuration <= THRILL_THRESHOLD
-    local isGroundSkim = math.abs(data.cooldownDuration - GROUND_SKIM_DURATION) < 0.05
-        and not isThrill
     return data.currentCharges, data.maxCharges,
            data.cooldownStartTime, data.cooldownDuration,
-           isThrill, isGroundSkim
-end
-
-local function GetSecondWindCharges()
-    local data = C_Spell.GetSpellCharges(SECOND_WIND_SPELL)
-    if not data then return 0 end
-    return data.currentCharges
-end
-
-local function GetWhirlingSurgeCooldown()
-    local data = C_Spell.GetSpellCooldown(WHIRLING_SURGE_SPELL)
-    if not data then return 0, 0 end
-    return data.startTime, data.duration
+           isThrill
 end
 
 local prevSpeed      = 0
@@ -227,27 +202,29 @@ local function RunUpdate()
     if not mainFrame then return end
 
     local charges, maxCharges, startTime, duration, isThrill = GetVigorInfo()
+    local isGliding, _, forwardSpeed = C_PlayerInfo.GetGlidingInfo()
 
-    if addon.db.ui_dragonriding_hideGroundedFull and not IsGliding() and charges >= maxCharges then
+    if addon.db.ui_dragonriding_hideGroundedFull and not isGliding and charges >= maxCharges then
         mainFrame:Hide()
         if surgeFrame then surgeFrame:Hide() end
         return
     end
 
     mainFrame:Show()
-    UpdateSpeedBar(GetForwardSpeed())
+    UpdateSpeedBar(forwardSpeed or 0)
     UpdateCharges(charges, maxCharges, startTime, duration)
     ApplyColors(isThrill)
 
     if addon.db.ui_dragonriding_showSecondWind then
-        UpdateSecondWind(charges + GetSecondWindCharges())
+        local swData = C_Spell.GetSpellCharges(SECOND_WIND_SPELL)
+        UpdateSecondWind(charges + (swData and swData.currentCharges or 0))
     else
         UpdateSecondWind(0)
     end
 
     if addon.db.ui_dragonriding_showWhirlingSurge then
-        local sStart, sDur = GetWhirlingSurgeCooldown()
-        UpdateWhirlingSurge(sStart, sDur)
+        local surgeData = C_Spell.GetSpellCooldown(WHIRLING_SURGE_SPELL)
+        UpdateWhirlingSurge(surgeData and surgeData.startTime or 0, surgeData and surgeData.duration or 0)
     else
         UpdateWhirlingSurge(0, 0)
     end
@@ -275,10 +252,11 @@ local function CheckMount()
     end
 end
 
-local function OnEvent(_, event, unit)
-    if event == "PLAYER_MOUNT_DISPLAY_CHANGED" then
-        CheckMount()
-    elseif isUpdating and (event == "SPELL_UPDATE_CHARGES" or (event == "UNIT_AURA" and unit == "player")) then
+local function OnEvent(_, event)
+    if event == "PLAYER_MOUNT_DISPLAY_CHANGED" or event == "UPDATE_SHAPESHIFT_FORM" then
+        -- Defer: GetGlidingInfo() hasn't settled yet at the instant these events fire.
+        C_Timer.After(0.15, CheckMount)
+    elseif isUpdating then
         RunUpdate()
     end
 end
@@ -379,8 +357,9 @@ function addon.MI_Dragonriding_Init()
     BuildUI()
     if addon.db.ui_dragonriding_enabled then
         eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+        eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
         eventFrame:RegisterEvent("SPELL_UPDATE_CHARGES")
-        eventFrame:RegisterEvent("UNIT_AURA")
+        eventFrame:RegisterUnitEvent("UNIT_AURA", "player")
         CheckMount()
     end
 end
@@ -389,8 +368,9 @@ function addon.MI_Dragonriding_SetEnabled(v)
     if not C_PlayerInfo or not C_PlayerInfo.GetGlidingInfo then return end
     if v then
         eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+        eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
         eventFrame:RegisterEvent("SPELL_UPDATE_CHARGES")
-        eventFrame:RegisterEvent("UNIT_AURA")
+        eventFrame:RegisterUnitEvent("UNIT_AURA", "player")
         CheckMount()
     else
         eventFrame:UnregisterAllEvents()
