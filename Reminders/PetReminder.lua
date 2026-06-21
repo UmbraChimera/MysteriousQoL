@@ -1,5 +1,8 @@
 local _, addon = ...
 
+local GetSpec     = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization     or GetSpecialization
+local GetSpecInfo = C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo or GetSpecializationInfo
+
 -- Hunter specs that require a pet (Beast Mastery = 253, Survival = 255)
 local HUNTER_PET_SPECS = { [253] = true, [255] = true }
 
@@ -32,13 +35,13 @@ local function isPetExpected()
         for _, spellID in ipairs(HUNTER_NO_PET_TALENTS) do
             if IsPlayerSpell(spellID) then return false end
         end
-        local specIndex = GetSpecialization()
-        local specID = specIndex and GetSpecializationInfo(specIndex)
+        local specIndex = GetSpec()
+        local specID = specIndex and GetSpecInfo(specIndex)
         return HUNTER_PET_SPECS[specID] == true
     end
     if addon.playerClass == "DEATHKNIGHT" then
-        local specIndex = GetSpecialization()
-        local specID = specIndex and GetSpecializationInfo(specIndex)
+        local specIndex = GetSpec()
+        local specID = specIndex and GetSpecInfo(specIndex)
         return specID == 252  -- Unholy only
     end
     return false

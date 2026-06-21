@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.2
+- Added **No Pet Sound** - plays a random baby murloc sound when you try to cast a pet ability without an active pet (e.g. Kill Command). 3 second throttle.
+- Added **Hide Error Messages** - hides the red UI error text (e.g. "You don't have a pet.", "Out of range.", "Spell is not ready yet.").
+- Added a pride minimap icon variant that automatically replaces the standard icon during June.
+- Added support for Interface 12.0.7 and 12.1.
+- Fixed **No Pet / Pet Idle Reminder** not showing on Hunter / Death Knight in 12.0 (spec lookup API moved to `C_SpecializationInfo`).
+- Fixed minimap button visuals (icon centering, border anchoring, hover highlight).
+- **Bloodlust Sound** now only fires inside instances.
+- Removed the **Guild Manager** module entirely.
+- Internal refactor: spell-cast sound modules now share a factory; CheatDeath / Mulch / Overload / Mail reminders consolidated into the central event dispatcher; `HideSocial.lua` renamed to `HideElements.lua` to match its actual scope.
+
 ## 1.2.1
 - Fixed **Victory Sound** not playing due to incorrect event argument
 - Removed **Release Protection** (alt-hold blocker on the release button) - was not working correctly.

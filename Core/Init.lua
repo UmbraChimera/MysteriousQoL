@@ -37,6 +37,8 @@ addon.defaults = {
     combat_diveReminder_enabled      = false,
 
     combat_mailReminder_enabled  = false,
+    combat_petMissingSound_enabled = false,
+    combat_petMissingSound_channel = "Master",
 
     -- General
     vendor_autoRepair            = false,
@@ -68,6 +70,7 @@ addon.defaults = {
     ui_hideTalkingHead_enabled    = false,
     ui_hideEventToasts_enabled    = false,
     ui_hideZoneText_enabled       = false,
+    ui_hideErrors_enabled         = false,
 
     -- UI > Dragonriding
     ui_dragonriding_enabled       = false,
@@ -90,15 +93,7 @@ addon.defaults = {
     ui_minimapButton_enabled      = true,
     ui_minimapButton_angle        = 220,
 
-    -- Guild
-    guild_alts_enabled          = false,
-    guild_chat_showMain         = true,
-    guild_log_enabled           = true,
-    guild_log_maxEntries        = 200,
-    guild_sync_enabled          = true,
-    guild_inactive_days         = 30,
-    guild_panel_scale           = 1.0,
-    settings_panel_scale        = 1.0,
+    settings_panel_scale          = 1.0,
 }
 
 -- Initialize the SavedVariables-backed DB, filling in any missing keys with defaults.
@@ -162,4 +157,24 @@ function addon.MI_CreateBouncingReminder(name, opts)
     frame.ResetBounce = function() bounceT = 0 end
 
     return frame
+end
+
+-- Plays a sound when the player casts one of the given spell IDs.
+-- opts: { dbKey, channelKey, spellIDs (set: { [id] = true }), sounds (string or array of paths) }
+function addon.MI_CreateSpellCastSound(opts)
+    local sounds = opts.sounds
+    local pickSound
+    if type(sounds) == "table" then
+        pickSound = function() return sounds[math.random(#sounds)] end
+    else
+        pickSound = function() return sounds end
+    end
+
+    local f = CreateFrame("Frame")
+    f:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+    f:SetScript("OnEvent", function(_, _, _, _, spellID)
+        if not addon.db[opts.dbKey] then return end
+        if not opts.spellIDs[spellID] then return end
+        PlaySoundFile(pickSound(), addon.db[opts.channelKey])
+    end)
 end

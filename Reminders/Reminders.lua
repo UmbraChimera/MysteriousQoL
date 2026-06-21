@@ -1,10 +1,7 @@
 local _, addon = ...
 
--- Center-screen reminders for:
---   * Missing class buff (buff-providing classes only)
---   * No active pet (Warlock / Hunter BM+Survival)
---   * Pet idle in combat (same classes)
---   * Don't release in a raid instance
+-- Central event dispatcher for all reminder modules.
+-- Each reminder exposes addon.MI_<Name>Reminder_Update() and is called on every refresh.
 
 local function updateReminders()
     addon.MI_BuffReminder_Update()
@@ -12,6 +9,9 @@ local function updateReminders()
     addon.MI_DeathReminder_Update()
     addon.MI_RepairReminder_Update()
     addon.MI_DiveReminder_Update()
+    addon.MI_CheatDeathReminder_Update()
+    addon.MI_MulchReminder_Update()
+    addon.MI_OverloadReminder_Update()
 end
 
 -- Throttled wrapper -coalesces rapid event fires (e.g. UNIT_AURA spam in raids)
@@ -50,15 +50,22 @@ local function RegisterReminderEvents()
     eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
     eventFrame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
     eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
-    eventFrame:RegisterUnitEvent("UNIT_AURA",           "player")
-    eventFrame:RegisterUnitEvent("UNIT_PET",            "player")
-    eventFrame:RegisterUnitEvent("UNIT_FLAGS",          "player", "pet")
-    eventFrame:RegisterUnitEvent("UNIT_ENTERED_VEHICLE","player")
-    eventFrame:RegisterUnitEvent("UNIT_EXITED_VEHICLE", "player")
+    eventFrame:RegisterUnitEvent("UNIT_AURA",            "player")
+    eventFrame:RegisterUnitEvent("UNIT_PET",             "player")
+    eventFrame:RegisterUnitEvent("UNIT_FLAGS",           "player", "pet")
+    eventFrame:RegisterUnitEvent("UNIT_ENTERED_VEHICLE", "player")
+    eventFrame:RegisterUnitEvent("UNIT_EXITED_VEHICLE",  "player")
+    eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
+    eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP",  "player")
     eventFrame:RegisterEvent("PET_BAR_UPDATE")
     eventFrame:RegisterEvent("SPELLS_CHANGED")
     eventFrame:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
-    eventFrame:SetScript("OnEvent", function() updateRemindersThrottled() end)
+    eventFrame:SetScript("OnEvent", function(_, event, isInitialLogin)
+        if event == "PLAYER_ENTERING_WORLD" and isInitialLogin then
+            addon.MI_MailReminder_OnLogin()
+        end
+        updateRemindersThrottled()
+    end)
     -- Fallback ticker for taxi and edge cases not covered by events
     ticker = C_Timer.NewTicker(5, updateReminders)
 end
@@ -69,6 +76,7 @@ local function UnregisterReminderEvents()
     eventFrame:UnregisterAllEvents()
     eventFrame:SetScript("OnEvent", nil)
     if ticker then ticker:Cancel() ticker = nil end
+    if pendingTimer then pendingTimer:Cancel() pendingTimer = nil end
 end
 
 local function AnyReminderEnabled()
@@ -79,6 +87,10 @@ local function AnyReminderEnabled()
         or db.combat_deathReminder_enabled
         or db.combat_repairReminder_enabled
         or db.combat_diveReminder_enabled
+        or db.combat_cheatDeathReminder_enabled
+        or db.combat_mulchReminder_enabled
+        or db.combat_overloadReminder_enabled
+        or db.combat_mailReminder_enabled
 end
 
 function addon.MI_Reminders_Init()

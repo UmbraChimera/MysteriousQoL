@@ -22,9 +22,7 @@ local function isCheatDeathActive()
     return false
 end
 
-local f = CreateFrame("Frame")
-f:RegisterUnitEvent("UNIT_AURA", "player")
-f:SetScript("OnEvent", function()
+function addon.MI_CheatDeathReminder_Update()
     if not addon.db.combat_cheatDeathReminder_enabled then
         wasActive = false
         return
@@ -34,4 +32,4 @@ f:SetScript("OnEvent", function()
         PlaySoundFile(SOUND, "Master")
     end
     wasActive = active
-end)
+end

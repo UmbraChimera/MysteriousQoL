@@ -92,28 +92,32 @@ local function BuildButton()
     button:SetFrameLevel(8)
     button:SetClampedToScreen(true)
 
-    -- Background
+    -- Background (circular minimap disc)
     local bg = button:CreateTexture(nil, "BACKGROUND")
-    bg:SetSize(20, 20)
-    bg:SetPoint("TOPLEFT", 6, -5)
-    bg:SetColorTexture(0.3, 0.3, 0.3, 1)
+    bg:SetSize(24, 24)
+    bg:SetPoint("CENTER")
+    bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
 
-    -- Icon
+    -- Icon (centered, sized to sit inside the border ring)
+    -- Auto-swaps to pride icon during June.
     local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(20, 20)
-    icon:SetPoint("TOPLEFT", 6, -5)
-    icon:SetTexture("Interface\\AddOns\\MysteriousQoL\\MysteriousQoL")
+    icon:SetSize(18, 18)
+    icon:SetPoint("CENTER")
+    local iconPath = (date("*t").month == 6)
+        and "Interface\\AddOns\\MysteriousQoL\\MysteriousQoLPride"
+        or  "Interface\\AddOns\\MysteriousQoL\\MysteriousQoL"
+    icon:SetTexture(iconPath)
 
-    -- Standard WoW minimap border overlay
+    -- Border (TOPLEFT-anchored; the ring sits in the upper-left of the 53x53 texture)
     local border = button:CreateTexture(nil, "OVERLAY")
-    border:SetSize(52, 52)
-    border:SetPoint("TOPLEFT")
+    border:SetSize(53, 53)
+    border:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 
     -- Highlight
     local highlight = button:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetSize(20, 20)	
-    highlight:SetPoint("TOPLEFT", 6, -5)
+    highlight:SetSize(18, 18)
+    highlight:SetPoint("CENTER")
     highlight:SetColorTexture(1, 1, 1, 0.15)
 
     -- Tooltip

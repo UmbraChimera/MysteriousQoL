@@ -71,16 +71,19 @@ frame:SetScript("OnEvent", function(self, _, name)
         UI.Header("Chat")
         UI.Checkbox("ui_chatCopy_enabled", "Chat Copy Button",
             "Adds a small copy button to each chat frame. Click to open a window with copyable chat text.",
-            function() if addon.MI_ChatCopy_UpdateVisibility then addon.MI_ChatCopy_UpdateVisibility() end end)
+            addon.MI_ChatCopy_UpdateVisibility)
 
         UI.Header("Hide Elements")
         UI.Checkbox("ui_hideAlerts_enabled", "Hide Alert Popups",
             "Hides achievement, loot, and other alert notifications.")
+        UI.Checkbox("ui_hideErrors_enabled", "Hide Error Messages",
+            "Hides the red UI error text (e.g. \"You don't have a pet.\", \"Out of range.\", \"Spell is not ready yet.\").",
+            addon.MI_HideElements_ApplyErrors)
         UI.Checkbox("ui_hideEventToasts_enabled", "Hide Event Toasts",
             "Hides event notifications.")
         UI.Checkbox("ui_hideSocial_enabled", "Hide Social Button",
             "Hides the Quick Join toast button near the minimap.",
-            function() if addon.MI_HideSocial_ApplySocial then addon.MI_HideSocial_ApplySocial() end end)
+            addon.MI_HideElements_ApplySocial)
         UI.Checkbox("ui_hideTalkingHead_enabled", "Hide Talking Head",
             "Hides the NPC talking head dialog frame.")
         UI.Checkbox("ui_hideZoneText_enabled", "Hide Zone Text",
@@ -89,27 +92,23 @@ frame:SetScript("OnEvent", function(self, _, name)
         UI.Header("Minimap")
         UI.Checkbox("ui_minimapButton_enabled", "Show Minimap Button",
             "Toggles the MysteriousQoL minimap button.",
-            function(v)
-                if addon.MI_MinimapButton_SetShown then addon.MI_MinimapButton_SetShown(v) end
-            end)
+            addon.MI_MinimapButton_SetShown)
 
         UI.Header("Mouse Ring")
         UI.Checkbox("ui_mouseRing_enabled", "Mouse Ring",
             "Shows a configurable ring around your cursor.",
-            function(v)
-                if addon.MI_MouseRing_SetEnabled then addon.MI_MouseRing_SetEnabled(v) end
-            end,
+            addon.MI_MouseRing_SetEnabled,
             {
                 { type = "slider", key = "ui_mouseRing_size", label = "Ring Size",
                   min = 20, max = 100, step = 1,
-                  onChange = function() if addon.MI_MouseRing_ApplyStyle then addon.MI_MouseRing_ApplyStyle() end end },
+                  onChange = addon.MI_MouseRing_ApplyStyle },
                 { type = "checkbox", key = "ui_mouseRing_hideDot", label = "Hide Center Dot",
-                  onChange = function() if addon.MI_MouseRing_ApplyStyle then addon.MI_MouseRing_ApplyStyle() end end },
+                  onChange = addon.MI_MouseRing_ApplyStyle },
                 { type = "checkbox", key = "ui_mouseRing_onlyInCombat", label = "Only Show In Combat" },
                 { type = "checkbox", key = "ui_mouseRing_onlyOnRightClick", label = "Only Show On Right-Click",
                   tooltip = "Ring is visible only while the right mouse button is held." },
                 { type = "checkbox", key = "ui_mouseRing_useClassColor", label = "Use Class Color",
-                  onChange = function() if addon.MI_MouseRing_ApplyStyle then addon.MI_MouseRing_ApplyStyle() end end },
+                  onChange = addon.MI_MouseRing_ApplyStyle },
                 { type = "checkbox", key = "ui_mouseRing_castProgress", label = "Show Cast Progress",
                   tooltip = "A ring sweeps along the outside to show cast or channel progress." },
             })
@@ -117,7 +116,7 @@ frame:SetScript("OnEvent", function(self, _, name)
         UI.Header("Skyriding")
         UI.Checkbox("ui_dragonriding_enabled", "Skyriding Vigor Tracker",
             "Shows a vigor charge bar and speed display while skyriding.",
-            function(v) if addon.MI_Dragonriding_SetEnabled then addon.MI_Dragonriding_SetEnabled(v) end end,
+            addon.MI_Dragonriding_SetEnabled,
             {
                 { type = "checkbox", key = "ui_dragonriding_showSpeed", label = "Show Speed Text",
                   tooltip = "Displays your forward speed as a number." },
@@ -132,9 +131,7 @@ frame:SetScript("OnEvent", function(self, _, name)
 
     UI.RegisterCategory("Reminders", function()
         UI.Header("Class Buff")
-        local function refreshReminders()
-            if addon.MI_Reminders_RefreshState then addon.MI_Reminders_RefreshState() end
-        end
+        local refreshReminders = addon.MI_Reminders_RefreshState
 
         UI.Checkbox("combat_buffReminder_enabled", "Class Buff Reminder",
             "Shows a glowing icon when your class buff is missing from you or any group member.",
@@ -167,6 +164,13 @@ frame:SetScript("OnEvent", function(self, _, name)
         UI.Checkbox("combat_petIdleReminder_enabled", "Pet Idle Reminder",
             "Shows a center-screen warning when your pet is alive but not attacking while you are in combat.",
             refreshReminders)
+        UI.Checkbox("combat_petMissingSound_enabled", "No Pet Sound",
+            "Plays a baby murloc sound when you try to cast a pet ability without an active pet.",
+            nil,
+            {
+                { type = "dropdown", key = "combat_petMissingSound_channel", label = "Sound Channel",
+                  options = channelOpts },
+            })
 
         UI.Header("Repair")
         UI.Checkbox("combat_repairReminder_enabled", "Repair Reminder",
@@ -289,17 +293,6 @@ end)
 -- Slash command
 
 SLASH_MYSTERIOUSQOL1 = "/mqol"
-SlashCmdList["MYSTERIOUSQOL"] = function(msg)
-    local cmd = msg and msg:lower() or ""
-    if cmd == "guild" then
-        if addon.MI_GuildPanel_Toggle then addon.MI_GuildPanel_Toggle() end
-        return
-    end
-    if cmd == "syncdebug" then
-        if addon.MI_GuildSync_ToggleDebug then addon.MI_GuildSync_ToggleDebug() end
-        return
-    end
-    if addon.customUI and addon.customUI.Toggle then
-        addon.customUI.Toggle()
-    end
+SlashCmdList["MYSTERIOUSQOL"] = function()
+    addon.customUI.Toggle()
 end

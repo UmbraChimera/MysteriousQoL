@@ -92,6 +92,15 @@ local function applyZoneTextVisibility()
     end
 end
 
+local function applyErrorVisibility()
+    if not UIErrorsFrame then return end
+    if addon.db.ui_hideErrors_enabled then
+        UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+    else
+        UIErrorsFrame:RegisterEvent("UI_ERROR_MESSAGE")
+    end
+end
+
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("ADDON_LOADED")
@@ -102,6 +111,7 @@ f:SetScript("OnEvent", function(_, event, name)
         hookTalkingHead()
         hookEventToasts()
         applyZoneTextVisibility()
+        applyErrorVisibility()
     elseif event == "ADDON_LOADED" then
         if name == "Blizzard_TalkingHeadUI" then
             hookTalkingHead()
@@ -110,6 +120,10 @@ f:SetScript("OnEvent", function(_, event, name)
 end)
 
 -- Expose for custom settings UI
-function addon.MI_HideSocial_ApplySocial()
+function addon.MI_HideElements_ApplySocial()
     applySocialVisibility()
+end
+
+function addon.MI_HideElements_ApplyErrors()
+    applyErrorVisibility()
 end

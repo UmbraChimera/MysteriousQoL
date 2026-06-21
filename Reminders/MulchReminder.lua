@@ -21,19 +21,19 @@ local mulchFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_MulchReminderF
     text     = "USE MULCH!",
 })
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP",  "player")
-eventFrame:SetScript("OnEvent", function(_, event, _, _, spellID)
-    if event == "UNIT_SPELLCAST_START" then
-        if not addon.db.combat_mulchReminder_enabled then return end
-        if IsInInstance() then return end
-        if spellID == SPELL_HERB and isMulchReady() then
-            mulchFrame.ResetBounce()
-            mulchFrame:Show()
-        end
-    elseif event == "UNIT_SPELLCAST_STOP" then
+local function hide()
+    mulchFrame.ResetBounce()
+    mulchFrame:Hide()
+end
+
+function addon.MI_MulchReminder_Update()
+    if not addon.db.combat_mulchReminder_enabled then return hide() end
+    if IsInInstance() then return hide() end
+    local castSpellID = select(9, UnitCastingInfo("player"))
+    if castSpellID == SPELL_HERB and isMulchReady() then
         mulchFrame.ResetBounce()
-        mulchFrame:Hide()
+        mulchFrame:Show()
+    else
+        hide()
     end
-end)
+end

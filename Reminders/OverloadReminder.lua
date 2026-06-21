@@ -24,25 +24,25 @@ local overloadFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_OverloadRem
     text     = "USE OVERLOAD!",
 })
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP",  "player")
-eventFrame:SetScript("OnEvent", function(_, event, _, _, spellID)
-    if event == "UNIT_SPELLCAST_START" then
-        if not addon.db.combat_overloadReminder_enabled then return end
-        if IsInInstance() then return end
-        local overloadID
-        if spellID == SPELL_HERB then
-            overloadID = OVERLOAD_HERB
-        elseif spellID == SPELL_MINING then
-            overloadID = OVERLOAD_MINING
-        end
-        if overloadID and isOffCooldown(overloadID) then
-            overloadFrame.ResetBounce()
-            overloadFrame:Show()
-        end
-    elseif event == "UNIT_SPELLCAST_STOP" then
-        overloadFrame.ResetBounce()
-        overloadFrame:Hide()
+local function hide()
+    overloadFrame.ResetBounce()
+    overloadFrame:Hide()
+end
+
+function addon.MI_OverloadReminder_Update()
+    if not addon.db.combat_overloadReminder_enabled then return hide() end
+    if IsInInstance() then return hide() end
+    local castSpellID = select(9, UnitCastingInfo("player"))
+    local overloadID
+    if castSpellID == SPELL_HERB then
+        overloadID = OVERLOAD_HERB
+    elseif castSpellID == SPELL_MINING then
+        overloadID = OVERLOAD_MINING
     end
-end)
+    if overloadID and isOffCooldown(overloadID) then
+        overloadFrame.ResetBounce()
+        overloadFrame:Show()
+    else
+        hide()
+    end
+end

@@ -26,11 +26,12 @@
 
 - **Chat Copy Button** - adds a small copy button to each chat frame. Click to open a window with selectable, copyable chat text.
 - **Hide Alert Popups** - hides achievement, loot, and other alert notifications.
+- **Hide Error Messages** - hides the red UI error text (e.g. "You don't have a pet.", "Out of range.", "Spell is not ready yet.").
 - **Hide Event Toasts** - hides event notifications.
 - **Hide Social Button** - hides the Quick Join toast button near the minimap.
 - **Hide Talking Head** - hides the NPC talking head dialog frame.
 - **Hide Zone Text** - hides the zone name popup when entering a new area.
-- **Minimap Button** - toggleable minimap button. Left-click opens settings, right-click opens a menu (settings, guild manager, hide), drag to reposition.
+- **Minimap Button** - toggleable minimap button. Left-click opens settings, right-click opens a menu, drag to reposition. Auto-swaps to a pride icon during June.
 - **Mouse Ring** - configurable ring around your cursor. Options: size, class color, hide center dot, only in combat, only on right-click, cast progress.
 - **Skyriding Vigor Tracker** - shows a vigor charge bar and speed display while skyriding. Options for Second Wind overlay, Whirling Surge cooldown, speed text, and auto-hide when full and grounded.
 
@@ -38,23 +39,14 @@
 
 - **Class Buff Reminder** - pulsing icon when your class buff is missing from you or any group member. Suppressed while dead, mounted, flying, in a vehicle, or on a taxi.
 - **Cheat Death Reminder** - plays a sound when Purgatory, Cheat Death, Cauterize, or Last Resort saves you. Only active in combat inside an instance.
-- **Class Buff Reminder** - pulsing icon when your class buff is missing from you or any group member. Suppressed while dead, mounted, flying, in a vehicle, or on a taxi.
 - **Don't Release Reminder** - large bouncing warning when you die in a raid instance to prevent accidental release.
 - **Imbued Mulch Reminder** - bouncing warning when you start herbing and Imbued Mulch is in your bags and off cooldown. Never shows inside instances.
 - **Mail Reminder** - plays a sound on initial login if you have unread mail.
 - **No Pet Reminder** - bouncing warning when you have no active pet (Warlock, Hunter BM/Survival, Unholy DK). Detects Grimoire of Sacrifice and no-pet talents.
+- **No Pet Sound** - plays a random baby murloc sound when you try to cast a pet ability without an active pet (e.g. Kill Command).
 - **Overload Reminder** - bouncing warning when you start mining or herbing with Overload off cooldown. Never shows inside instances.
 - **Pet Idle Reminder** - bouncing warning when your pet is alive but not attacking while you are in combat.
 - **Repair Reminder** - bouncing warning when any equipped gear drops to 50% durability.
-
-## Guild - Disabled for now
-
-- **Roster Panel** - view all tracked guild members with main/alt grouping, online status, class colors, join date, last seen, and inactivity flags. Filter and sort by name, rank, or join date.
-- **Alt Tracking** - link characters into main/alt groups. Set nicknames displayed for alts in the roster and tooltips.
-- **Activity Log** - records guild joins, leaves, promotions, and demotions with timestamps.
-- **Peer Sync** - automatically syncs alt/main data between guild members running MysteriousQoL via addon messages.
-- **Import / Export** - share guild data as a text string for manual transfer.
-- **Communities Integration** - shows main/alt info in community member tooltips.
 
 ## Fun
 

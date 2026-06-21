@@ -27,6 +27,11 @@ f:SetScript("OnEvent", function()
         return
     end
 
+    if not IsInInstance() then
+        played = false
+        return
+    end
+
     local active = false
     for id in pairs(MI_LUST_IDS) do
         if C_UnitAuras.GetPlayerAuraBySpellID(id) then
