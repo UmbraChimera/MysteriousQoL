@@ -19,9 +19,26 @@ local MI_LUST_IDS = {
 
 local played = false
 
+local function isLustActive()
+    for id in pairs(MI_LUST_IDS) do
+        if C_UnitAuras.GetPlayerAuraBySpellID(id) then
+            return true
+        end
+    end
+    return false
+end
+
 local f = CreateFrame("Frame")
 f:RegisterUnitEvent("UNIT_AURA", "player")
-f:SetScript("OnEvent", function()
+f:RegisterEvent("PLAYER_ENTERING_WORLD")
+f:SetScript("OnEvent", function(_, event)
+    -- Zone-in seeds the rising-edge detector so the sound never fires from the
+    -- aura-refresh that fires on PLAYER_ENTERING_WORLD with Sated already active.
+    if event == "PLAYER_ENTERING_WORLD" then
+        played = isLustActive()
+        return
+    end
+
     if not addon.db.fun_bloodlust_enabled then
         played = false
         return
@@ -32,13 +49,7 @@ f:SetScript("OnEvent", function()
         return
     end
 
-    local active = false
-    for id in pairs(MI_LUST_IDS) do
-        if C_UnitAuras.GetPlayerAuraBySpellID(id) then
-            active = true
-            break
-        end
-    end
+    local active = isLustActive()
 
     if active and not played then
         PlaySoundFile(SOUND_DIR .. addon.db.fun_bloodlust_sound, addon.db.fun_bloodlust_channel)

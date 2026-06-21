@@ -67,7 +67,7 @@ local function BuildCopyFrame()
     copyScroll:SetPoint("TOPLEFT", 8, -28)
     copyScroll:SetPoint("BOTTOMRIGHT", -28, 8)
 
-    -- EditBox
+    -- EditBox (read-only: any edit attempts revert to the original text)
     copyEdit = CreateFrame("EditBox", nil, copyScroll)
     copyEdit:SetMultiLine(true)
     copyEdit:SetAutoFocus(false)
@@ -75,6 +75,15 @@ local function BuildCopyFrame()
     copyEdit:SetTextColor(1, 1, 1, 1)
     copyEdit:SetWidth(COPY_WIDTH - 40)
     copyEdit:SetScript("OnEscapePressed", function() copyFrame:Hide() end)
+    copyEdit:SetScript("OnTextChanged", function(self)
+        if self.suppress then return end
+        if self.originalText and self:GetText() ~= self.originalText then
+            self.suppress = true
+            self:SetText(self.originalText)
+            self:HighlightText()
+            self.suppress = false
+        end
+    end)
     copyScroll:SetScrollChild(copyEdit)
 end
 
@@ -130,7 +139,10 @@ end
 local function OpenCopyWindow(chatFrame)
     BuildCopyFrame()
     local text = GetChatMessages(chatFrame)
+    copyEdit.suppress = true
+    copyEdit.originalText = text
     copyEdit:SetText(text)
+    copyEdit.suppress = false
     copyFrame:Show()
     copyEdit:SetFocus()
     copyEdit:HighlightText()

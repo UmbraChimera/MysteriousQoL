@@ -14,6 +14,9 @@ local lastSize       = nil
 local lastClassColor = nil
 local lastHideDot    = nil
 
+-- Cached last cursor position so we can skip SetPoint when the cursor hasn't moved
+local lastCx, lastCy = nil, nil
+
 -- Cast progress state
 local castStart        = 0
 local castEnd          = 0
@@ -129,21 +132,27 @@ runner:SetScript("OnUpdate", function()
             ringFrame:Hide()
             ringFrame.castRing:Hide()
             castRingSetStart = nil
+            lastCx, lastCy = nil, nil
         end
         return
     end
-    if not ringFrame:IsShown() then ringFrame:Show() end
+    if not ringFrame:IsShown() then
+        ringFrame:Show()
+        lastCx, lastCy = nil, nil
+    end
 
-    -- Follow cursor
+    -- Follow cursor; skip SetPoint when the cursor hasn't moved
     local x, y = GetCursorPosition()
     local scale = UIParent:GetEffectiveScale()
     local cx = x / scale
     local cy = y / scale
-    ringFrame:ClearAllPoints()
-    ringFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx, cy)
-    -- Cast ring follows the same point (it's independently sized)
-    ringFrame.castRing:ClearAllPoints()
-    ringFrame.castRing:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx, cy)
+    if cx ~= lastCx or cy ~= lastCy then
+        ringFrame:ClearAllPoints()
+        ringFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx, cy)
+        ringFrame.castRing:ClearAllPoints()
+        ringFrame.castRing:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cx, cy)
+        lastCx, lastCy = cx, cy
+    end
 
     -- Detect style changes
     local size    = tonumber(db.ui_mouseRing_size) or 70
