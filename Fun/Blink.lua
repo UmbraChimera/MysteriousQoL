@@ -10,8 +10,7 @@ local SPELL_IDS = {
 }
 
 addon.MI_CreateSpellCastSound({
-    dbKey      = "fun_blink_enabled",
-    channelKey = "fun_blink_channel",
-    spellIDs   = SPELL_IDS,
-    sounds     = SOUND,
+    dbKey    = "fun_blink_enabled",
+    spellIDs = SPELL_IDS,
+    sounds   = SOUND,
 })

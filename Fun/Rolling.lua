@@ -14,8 +14,7 @@ local SPELL_IDS = {
 }
 
 addon.MI_CreateSpellCastSound({
-    dbKey      = "fun_rolling_enabled",
-    channelKey = "fun_rolling_channel",
-    spellIDs   = SPELL_IDS,
-    sounds     = SOUNDS,
+    dbKey    = "fun_rolling_enabled",
+    spellIDs = SPELL_IDS,
+    sounds   = SOUNDS,
 })

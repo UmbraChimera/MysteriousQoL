@@ -52,7 +52,7 @@ f:SetScript("OnEvent", function(_, event)
     local active = isLustActive()
 
     if active and not played then
-        PlaySoundFile(SOUND_DIR .. addon.db.fun_bloodlust_sound, addon.db.fun_bloodlust_channel)
+        PlaySoundFile(SOUND_DIR .. addon.db.fun_bloodlust_sound, addon.db.sound_channel)
         played = true
     elseif not active then
         played = false

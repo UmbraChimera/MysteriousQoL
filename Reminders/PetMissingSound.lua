@@ -29,5 +29,5 @@ f:SetScript("OnEvent", function(_, _, _, message)
     local now = GetTime()
     if now - lastPlayed < THROTTLE then return end
     lastPlayed = now
-    PlaySoundFile(SOUNDS[math.random(#SOUNDS)], addon.db.combat_petMissingSound_channel)
+    PlaySoundFile(SOUNDS[math.random(#SOUNDS)], addon.db.sound_channel)
 end)

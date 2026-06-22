@@ -21,6 +21,13 @@ frame:SetScript("OnEvent", function(self, _, name)
     addon.MI_SettingsUI_Init()
 
     UI.RegisterCategory("General", function()
+        UI.Header("Settings")
+        UI.Dropdown("sound_channel", "Sound Channel", channelOpts,
+            "Audio channel used by every addon sound.")
+        UI.Checkbox("ui_minimapButton_enabled", "Show Minimap Button",
+            "Toggles the MysteriousQoL minimap button.",
+            addon.MI_MinimapButton_SetShown)
+
         UI.Header("Automation")
         UI.Checkbox("general_ahCurrentExpansion", "AH: Current Expansion Only",
             "Automatically enables the Current Expansion filter when opening the Auction House.")
@@ -88,11 +95,6 @@ frame:SetScript("OnEvent", function(self, _, name)
             "Hides the NPC talking head dialog frame.")
         UI.Checkbox("ui_hideZoneText_enabled", "Hide Zone Text",
             "Hides the zone name popup when entering a new area.")
-
-        UI.Header("Minimap")
-        UI.Checkbox("ui_minimapButton_enabled", "Show Minimap Button",
-            "Toggles the MysteriousQoL minimap button.",
-            addon.MI_MinimapButton_SetShown)
 
         UI.Header("Mouse Ring")
         UI.Checkbox("ui_mouseRing_enabled", "Mouse Ring",
@@ -165,12 +167,7 @@ frame:SetScript("OnEvent", function(self, _, name)
             "Shows a center-screen warning when your pet is alive but not attacking while you are in combat.",
             refreshReminders)
         UI.Checkbox("combat_petMissingSound_enabled", "No Pet Sound",
-            "Plays a baby murloc sound when you try to cast a pet ability without an active pet.",
-            nil,
-            {
-                { type = "dropdown", key = "combat_petMissingSound_channel", label = "Sound Channel",
-                  options = channelOpts },
-            })
+            "Plays a baby murloc sound when you try to cast a pet ability without an active pet.")
 
         UI.Header("Repair")
         UI.Checkbox("combat_repairReminder_enabled", "Repair Reminder",
@@ -186,21 +183,11 @@ frame:SetScript("OnEvent", function(self, _, name)
     UI.RegisterCategory("Fun", function()
         UI.Header("Batman")
         UI.Checkbox("fun_batman_enabled", "Batman Teleport Sound",
-            "Plays batman.ogg when you teleport to a new zone via hearthstone, mage portal, or toy.",
-            nil,
-            {
-                { type = "dropdown", key = "fun_batman_channel", label = "Sound Channel",
-                  options = channelOpts },
-            })
+            "Plays batman.ogg when you teleport to a new zone via hearthstone, mage portal, or toy.")
 
         UI.Header("Blink")
         UI.Checkbox("fun_blink_enabled", "Blink Sound",
-            "Plays a DBZ sound when you use Blink or Shimmer (Mage) or Shift (Demon Hunter).",
-            nil,
-            {
-                { type = "dropdown", key = "fun_blink_channel", label = "Sound Channel",
-                  options = channelOpts },
-            })
+            "Plays a DBZ sound when you use Blink or Shimmer (Mage) or Shift (Demon Hunter).")
 
         UI.Header("Bloodlust")
         UI.Checkbox("fun_bloodlust_enabled", "Bloodlust Sound",
@@ -212,45 +199,23 @@ frame:SetScript("OnEvent", function(self, _, name)
                       { text = "R2-D2", value = "r2d2.ogg" },
                       { text = "Wei",   value = "wei.ogg" },
                   }},
-                { type = "dropdown", key = "fun_bloodlust_channel", label = "Sound Channel",
-                  options = channelOpts },
             })
 
         UI.Header("Owen Wilson")
         UI.Checkbox("fun_owenWilson_enabled", "Owen Wilson Loot Sounds",
-            "Plays a random Owen Wilson \"wow\" sound whenever a loot window opens.",
-            nil,
-            {
-                { type = "dropdown", key = "fun_owenWilson_channel", label = "Sound Channel",
-                  options = channelOpts, tooltip = "Which audio channel to use for Owen Wilson sounds." },
-            })
+            "Plays a random Owen Wilson \"wow\" sound whenever a loot window opens.")
 
         UI.Header("Roll")
         UI.Checkbox("fun_rolling_enabled", "Roll Sound",
-            "Plays a random sound when you use Roll or Chi Torpedo (Monk).",
-            nil,
-            {
-                { type = "dropdown", key = "fun_rolling_channel", label = "Sound Channel",
-                  options = channelOpts },
-            })
+            "Plays a random sound when you use Roll or Chi Torpedo (Monk).")
 
         UI.Header("Stealth")
         UI.Checkbox("fun_sneaky_enabled", "Stealth Sound",
-            "Plays a sound when you enter Stealth (Rogue) or Prowl (Druid).",
-            nil,
-            {
-                { type = "dropdown", key = "fun_sneaky_channel", label = "Sound Channel",
-                  options = channelOpts },
-            })
+            "Plays a sound when you enter Stealth (Rogue) or Prowl (Druid).")
 
         UI.Header("Vendor")
         UI.Checkbox("fun_vendorSound_enabled", "Vendor Grey Sound",
-            "Plays a money sound when grey items are sold, whether by the Auto-Sell option or the in-game Sell All Junk button.",
-            nil,
-            {
-                { type = "dropdown", key = "fun_vendorSound_channel", label = "Sound Channel",
-                  options = channelOpts },
-            })
+            "Plays a money sound when grey items are sold, whether by the Auto-Sell option or the in-game Sell All Junk button.")
 
         UI.Header("Zoomies")
         UI.Checkbox("fun_zoomies_enabled", "Zoomies Sound",
@@ -269,8 +234,6 @@ frame:SetScript("OnEvent", function(self, _, name)
                 { type = "checkbox", key = "fun_zoomies_rush",
                   label = "|cff8788EEBurning Rush|r",
                   tooltip = "Play zoomies for Burning Rush (Warlock)." },
-                { type = "dropdown", key = "fun_zoomies_channel", label = "Sound Channel",
-                  options = channelOpts },
             })
     end)
 

@@ -19,7 +19,7 @@ f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", function(_, event, achievementID)
     if event == "ACHIEVEMENT_EARNED" then
         if ACHIEVEMENTS[achievementID] then
-            PlaySoundFile(SOUND, addon.db.fun_victory_channel)
+            PlaySoundFile(SOUND, addon.db.sound_channel)
         end
     else
         if IsInInstance() then

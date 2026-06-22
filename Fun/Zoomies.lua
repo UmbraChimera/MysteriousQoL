@@ -26,7 +26,7 @@ local function isSpellEnabled(spellID)
 end
 
 local function playZoom()
-    zoomHandle = select(2, PlaySoundFile(SOUND, addon.db.fun_zoomies_channel))
+    zoomHandle = select(2, PlaySoundFile(SOUND, addon.db.sound_channel))
 end
 
 local function startZoom()

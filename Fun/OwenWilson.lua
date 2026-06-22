@@ -19,5 +19,5 @@ local lootFrame = CreateFrame("Frame")
 lootFrame:RegisterEvent("LOOT_OPENED")
 lootFrame:SetScript("OnEvent", function()
     if not addon.db.fun_owenWilson_enabled then return end
-    PlaySoundFile(SOUNDS[math.random(#SOUNDS)], addon.db.fun_owenWilson_channel)
+    PlaySoundFile(SOUNDS[math.random(#SOUNDS)], addon.db.sound_channel)
 end)

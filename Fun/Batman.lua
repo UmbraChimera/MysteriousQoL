@@ -22,7 +22,7 @@ f:SetScript("OnEvent", function(_, event, isInitialLogin, isReloadingUI)
             and not UnitIsDeadOrGhost("player")
             and addon.db.fun_batman_enabled
         then
-            PlaySoundFile(SOUND, addon.db.fun_batman_channel)
+            PlaySoundFile(SOUND, addon.db.sound_channel)
         end
         didLoadingScreen = false
     end

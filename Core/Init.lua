@@ -2,29 +2,23 @@ local _, addon = ...
 
 -- Default values for all settings. Each feature owns its own keys.
 addon.defaults = {
+    -- Global
+    sound_channel = "Master",
+
     -- Fun
-    fun_owenWilson_enabled = false,
-    fun_owenWilson_channel = "Master",
+    fun_owenWilson_enabled   = false,
     fun_batman_enabled       = false,
-    fun_batman_channel       = "Master",
     fun_bloodlust_enabled    = false,
     fun_bloodlust_sound      = "r2d2.ogg",
-    fun_bloodlust_channel    = "Master",
     fun_blink_enabled        = false,
-    fun_blink_channel        = "Master",
     fun_sneaky_enabled       = false,
-    fun_sneaky_channel       = "Master",
     fun_rolling_enabled      = false,
-    fun_rolling_channel      = "Master",
     fun_zoomies_enabled      = false,
-    fun_zoomies_channel      = "Master",
     fun_zoomies_cheetah      = true,
     fun_zoomies_dash         = true,
     fun_zoomies_steed        = true,
     fun_zoomies_rush         = true,
-    fun_victory_channel      = "Master",
     fun_vendorSound_enabled  = false,
-    fun_vendorSound_channel  = "Master",
     -- Combat
     combat_buffReminder_enabled      = false,
     combat_petReminder_enabled       = false,
@@ -38,7 +32,6 @@ addon.defaults = {
 
     combat_mailReminder_enabled  = false,
     combat_petMissingSound_enabled = false,
-    combat_petMissingSound_channel = "Master",
 
     -- General
     vendor_autoRepair            = false,
@@ -160,7 +153,7 @@ function addon.MI_CreateBouncingReminder(name, opts)
 end
 
 -- Plays a sound when the player casts one of the given spell IDs.
--- opts: { dbKey, channelKey, spellIDs (set: { [id] = true }), sounds (string or array of paths) }
+-- opts: { dbKey, spellIDs (set: { [id] = true }), sounds (string or array of paths) }
 function addon.MI_CreateSpellCastSound(opts)
     local sounds = opts.sounds
     local pickSound
@@ -175,6 +168,6 @@ function addon.MI_CreateSpellCastSound(opts)
     f:SetScript("OnEvent", function(_, _, _, _, spellID)
         if not addon.db[opts.dbKey] then return end
         if not opts.spellIDs[spellID] then return end
-        PlaySoundFile(pickSound(), addon.db[opts.channelKey])
+        PlaySoundFile(pickSound(), addon.db.sound_channel)
     end)
 end

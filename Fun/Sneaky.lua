@@ -9,8 +9,7 @@ local SPELL_IDS = {
 }
 
 addon.MI_CreateSpellCastSound({
-    dbKey      = "fun_sneaky_enabled",
-    channelKey = "fun_sneaky_channel",
-    spellIDs   = SPELL_IDS,
-    sounds     = SOUND,
+    dbKey    = "fun_sneaky_enabled",
+    spellIDs = SPELL_IDS,
+    sounds   = SOUND,
 })
