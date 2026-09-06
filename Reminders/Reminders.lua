@@ -60,10 +60,7 @@ local function RegisterReminderEvents()
     eventFrame:RegisterEvent("PET_BAR_UPDATE")
     eventFrame:RegisterEvent("SPELLS_CHANGED")
     eventFrame:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
-    eventFrame:SetScript("OnEvent", function(_, event, isInitialLogin)
-        if event == "PLAYER_ENTERING_WORLD" and isInitialLogin then
-            addon.MI_MailReminder_OnLogin()
-        end
+    eventFrame:SetScript("OnEvent", function()
         updateRemindersThrottled()
     end)
     -- Fallback ticker for taxi and edge cases not covered by events
@@ -90,7 +87,6 @@ local function AnyReminderEnabled()
         or db.combat_cheatDeathReminder_enabled
         or db.combat_mulchReminder_enabled
         or db.combat_overloadReminder_enabled
-        or db.combat_mailReminder_enabled
 end
 
 function addon.MI_Reminders_Init()
@@ -108,6 +104,9 @@ function addon.MI_Reminders_RefreshState()
         RegisterReminderEvents()
         updateReminders()
     else
+        -- Give every module one final pass so visible frames and transient state
+        -- are cleared before their event source and fallback ticker stop.
+        updateReminders()
         UnregisterReminderEvents()
     end
 end

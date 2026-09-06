@@ -45,6 +45,9 @@ local CONTENT_PAD_T   = 14
 local WIDGET_HEIGHT   = 30
 local INDENT          = 24
 local SECTION_GAP     = 14
+local PANEL_SCALE_MIN = 0.6
+local PANEL_SCALE_MAX = 2.0
+local PANEL_EDGE_PAD  = 24
 
 -- Toggle-switch geometry (used by Checkbox widget)
 local TOGGLE_W, TOGGLE_H = 38, 20
@@ -59,8 +62,6 @@ local CATEGORY_DESCRIPTIONS = {
     ["UI"]         = "Interface customization and frame visibility.",
     ["Reminders"]  = "Don't miss the things that matter.",
     ["Fun"]        = "Sounds and silly things.",
-    ["Guild"]      = "Guild roster, sync, and member tracking.",
-    ["Guild Data"] = "Import, export, and raw guild data.",
 }
 
 local mainFrame, contentFrame, scrollFrame, scrollChild
@@ -95,6 +96,31 @@ local function MakeBackdrop(frame, bgColor, borderColor, edgeSize)
     end
 end
 
+local function GetMaxPanelScale()
+    local parentWidth = UIParent and UIParent:GetWidth() or 0
+    local parentHeight = UIParent and UIParent:GetHeight() or 0
+    if parentWidth <= 0 or parentHeight <= 0 then
+        return PANEL_SCALE_MAX
+    end
+
+    local fitWidth = math.max(1, parentWidth - PANEL_EDGE_PAD * 2) / FRAME_WIDTH
+    local fitHeight = math.max(1, parentHeight - PANEL_EDGE_PAD * 2) / FRAME_HEIGHT
+    return math.max(0.1, math.min(PANEL_SCALE_MAX, fitWidth, fitHeight))
+end
+
+local function ClampPanelScale(value)
+    local maxScale = GetMaxPanelScale()
+    local minScale = math.min(PANEL_SCALE_MIN, maxScale)
+    return math.max(minScale, math.min(maxScale, tonumber(value) or 1.0))
+end
+
+local function ApplyPanelScale(value, persist)
+    local scale = ClampPanelScale(value)
+    if mainFrame then mainFrame:SetScale(scale) end
+    if persist and addon.db then addon.db.settings_panel_scale = scale end
+    return scale
+end
+
 local function RecalcLayout()
     if not scrollChild then return end
     local y = -CONTENT_PAD_T
@@ -103,6 +129,7 @@ local function RecalcLayout()
             if entry.visible == false then
                 entry.frame:Hide()
             else
+                entry.frame:SetHeight(entry.height or WIDGET_HEIGHT)
                 entry.frame:ClearAllPoints()
                 entry.frame:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", entry.indent or 0, y)
                 entry.frame:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
@@ -182,6 +209,7 @@ end
 -- Widget: Checkbox (rendered as a toggle switch on the right)
 
 function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
+    local widgetList = allWidgets
     local frame = CreateFrame("Frame", nil, scrollChild)
     frame:SetHeight(WIDGET_HEIGHT)
 
@@ -230,6 +258,38 @@ function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
     text:SetText(label)
 
     local desc
+    local entry
+    local descriptionLayoutQueued = false
+    local lastMeasuredWidth
+
+    local function UpdateDescriptionHeight()
+        descriptionLayoutQueued = false
+        if not desc or not entry or not frame:IsShown() then return end
+
+        local width = frame:GetWidth()
+        if width <= 0 then return end
+        lastMeasuredWidth = width
+
+        -- The FontString already has its wrapped width from its left/right
+        -- anchors.  GetStringHeight therefore reflects the actual rendered
+        -- lines rather than estimating them from the unwrapped string width.
+        local descHeight = desc:GetStringHeight() or 0
+        local height = math.max(WIDGET_HEIGHT, math.ceil(18 + descHeight))
+        if math.abs((entry.height or WIDGET_HEIGHT) - height) < 0.5 then return end
+
+        entry.height = height
+        frame:SetHeight(height)
+        if allWidgets == widgetList then
+            RecalcLayout()
+        end
+    end
+
+    local function QueueDescriptionLayout()
+        if descriptionLayoutQueued then return end
+        descriptionLayoutQueued = true
+        C_Timer.After(0, UpdateDescriptionHeight)
+    end
+
     if tooltip then
         desc = frame:CreateFontString(nil, "OVERLAY")
         desc:SetFont(FONT, 10, "")
@@ -240,15 +300,10 @@ function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
         desc:SetText(tooltip)
         desc:SetWordWrap(true)
 
-        frame:SetScript("OnShow", function()
-            local availW = frame:GetWidth() - TOGGLE_W - 12
-            if availW <= 0 then return end
-            local lines = math.ceil((desc:GetStringWidth() or 0) / availW)
-            local extra = 0
-            if lines > 1 then extra = (lines - 1) * 12 end
-            local h = WIDGET_HEIGHT + extra
-            for _, e in ipairs(allWidgets) do
-                if e.frame == frame then e.height = h; break end
+        frame:SetScript("OnShow", QueueDescriptionLayout)
+        frame:SetScript("OnSizeChanged", function(_, width)
+            if not lastMeasuredWidth or math.abs(width - lastMeasuredWidth) >= 0.5 then
+                QueueDescriptionLayout()
             end
         end)
     end
@@ -284,7 +339,9 @@ function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
         track:SetBackdropBorderColor(unpack(C.primaryDim))
     end)
 
-    table.insert(allWidgets, { frame = frame, height = WIDGET_HEIGHT, key = key, refresh = Refresh })
+    entry = { frame = frame, height = WIDGET_HEIGHT, key = key, refresh = Refresh }
+    table.insert(widgetList, entry)
+    if desc then QueueDescriptionLayout() end
 
     if children then
         local function MarkChild()
@@ -657,9 +714,18 @@ local function BuildMainFrame()
     mainFrame:RegisterForDrag("LeftButton")
     mainFrame:SetScript("OnDragStart", mainFrame.StartMoving)
     mainFrame:SetScript("OnDragStop", mainFrame.StopMovingOrSizing)
+    mainFrame:SetScript("OnShow", function()
+        ApplyPanelScale(addon.db.settings_panel_scale, false)
+    end)
     MakeBackdrop(mainFrame, C.bgMain, C.primaryBorder)
-    mainFrame:SetScale(addon.db.settings_panel_scale or 1.0)
+    ApplyPanelScale(addon.db.settings_panel_scale, true)
     mainFrame:Hide()
+
+    UIParent:HookScript("OnSizeChanged", function()
+        -- Preserve the user's preferred value in the DB while temporarily
+        -- fitting the frame to a smaller window or UI scale.
+        ApplyPanelScale(addon.db.settings_panel_scale, false)
+    end)
 
     table.insert(UISpecialFrames, "MysteriousQoL_SettingsFrame")
 
@@ -708,7 +774,28 @@ local function BuildMainFrame()
     sidebarBody = CreateFrame("Frame", nil, sidebar)
     sidebarBody:SetPoint("TOPLEFT", 0, -76)
     sidebarBody:SetPoint("TOPRIGHT", 0, -76)
-    sidebarBody:SetPoint("BOTTOM", 0, 16)
+    sidebarBody:SetPoint("BOTTOM", 0, 40)
+
+    local changelogButton = CreateFrame("Button", nil, sidebar, "BackdropTemplate")
+    changelogButton:SetSize(104, 22)
+    changelogButton:SetPoint("BOTTOMLEFT", 12, 10)
+    MakeBackdrop(changelogButton, C.bgHeader, C.primaryDim)
+    local changelogText = changelogButton:CreateFontString(nil, "OVERLAY")
+    changelogText:SetFont(FONT, 10, "")
+    changelogText:SetPoint("CENTER")
+    changelogText:SetTextColor(unpack(C.textGray))
+    changelogText:SetText("Changelog")
+    changelogButton:SetScript("OnEnter", function()
+        changelogButton:SetBackdropBorderColor(unpack(C.primaryBright))
+        changelogText:SetTextColor(unpack(C.text))
+    end)
+    changelogButton:SetScript("OnLeave", function()
+        changelogButton:SetBackdropBorderColor(unpack(C.primaryDim))
+        changelogText:SetTextColor(unpack(C.textGray))
+    end)
+    changelogButton:SetScript("OnClick", function()
+        addon.MI_Changelog_Toggle()
+    end)
 
     -- Header banner (above content, right of sidebar)
     local header = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
@@ -906,17 +993,15 @@ local function BuildMainFrame()
     grip:SetScript("OnMouseUp", function()
         if gripDragging then
             local snapped = math.floor(mainFrame:GetScale() / 0.05 + 0.5) * 0.05
-            snapped = math.max(0.6, math.min(2.0, snapped))
-            addon.db.settings_panel_scale = snapped
-            mainFrame:SetScale(snapped)
+            ApplyPanelScale(snapped, true)
         end
         gripDragging = false
     end)
     grip:SetScript("OnUpdate", function()
         if not gripDragging then return end
         local cx = GetCursorPosition()
-        local newScale = math.max(0.6, math.min(2.0, gripStartScale + (cx - gripStartX) / 500))
-        mainFrame:SetScale(newScale)
+        local newScale = gripStartScale + (cx - gripStartX) / 500
+        ApplyPanelScale(newScale, false)
     end)
 end
 
@@ -925,7 +1010,7 @@ function addon.MI_SettingsUI_Init()
 end
 
 function addon.MI_SettingsUI_BuildTabs()
-    local order = { "General", "UI", "Reminders", "Fun", "Guild", "Guild Data" }
+    local order = { "General", "UI", "Reminders", "Fun" }
     local validTabs = {}
     for _, name in ipairs(order) do
         if categoryBuilders[name] then
@@ -940,6 +1025,14 @@ function addon.MI_SettingsUI_BuildTabs()
     if validTabs[1] then
         addon.customUI.OpenTab(validTabs[1])
     end
+end
+
+function addon.MI_SettingsUI_ResetLayout()
+    if not mainFrame then return end
+
+    ApplyPanelScale(1.0, true)
+    mainFrame:ClearAllPoints()
+    mainFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 end
 
 function addon.customUI.Toggle()

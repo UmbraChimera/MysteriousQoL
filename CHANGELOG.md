@@ -1,137 +1,71 @@
 # Changelog
 
+## 1.4.0
+- Added Ready Check Preflight for durability, weapon buffs, food, flask, Healthstones, and group Soulstone coverage when a Warlock is present.
+- Added an in-game Changelog button in the settings sidebar.
+
+## 1.3.0
+- Added gear indicators and Victory Sound; improved settings migration, validation, UI, and reminders; removed the retired Guild Manager.
+
 ## 1.2.2
-- Added **No Pet Sound** - plays a random baby murloc sound when you try to cast a pet ability without an active pet (e.g. Kill Command). 3 second throttle.
-- Added **Hide Error Messages** - hides the red UI error text (e.g. "You don't have a pet.", "Out of range.", "Spell is not ready yet.").
-- Added a pride minimap icon variant that automatically replaces the standard icon during June.
-- Added support for Interface 12.0.7 and 12.1.
-- Fixed **No Pet / Pet Idle Reminder** not showing on Hunter / Death Knight in 12.0 (spec lookup API moved to `C_SpecializationInfo`).
-- Fixed minimap button visuals (icon centering, border anchoring, hover highlight).
-- **Bloodlust Sound** now only fires inside instances.
-- Removed the **Guild Manager** module entirely.
-- Internal refactor: spell-cast sound modules now share a factory; CheatDeath / Mulch / Overload / Mail reminders consolidated into the central event dispatcher; `HideSocial.lua` renamed to `HideElements.lua` to match its actual scope.
+- Added No Pet Sound and Hide Error Messages; updated Retail compatibility and several reminder/UI behaviors.
 
 ## 1.2.1
-- Fixed **Victory Sound** not playing due to incorrect event argument
-- Removed **Release Protection** (alt-hold blocker on the release button) - was not working correctly.
-- Removed **Shame Sound** - was not firing correctly.
-- Added **Cheat Death Reminder** - when Purgatory (Death Knight), Cheat Death (Rogue), Cauterize (Fire Mage), or Last Resort (Demon Hunter) saves you. Only active in combat inside an instance.
-- Added **Imbued Mulch Reminder** - bouncing warning when you start herbing and Imbued Mulch is in your bags and off cooldown. Never shows inside instances.
-- Fixed **Overload Reminder**
+- Added Cheat Death and Imbued Mulch reminders; removed broken Release Protection and Shame Sound.
 
 ## 1.2.0.1
-- Fixed guild roster showing characters as "Left" due to a WoW API bug that returns doubled realm suffixes (e.g. `Name-Realm-Realm`). Names are now normalized on read, and existing bad entries are pruned on load.
-- Fixed guild sync repeatedly retrying against untrusted-rank peers after their data was rejected, causing an infinite request loop.
-- Guild sync is now suppressed while inside any instance.
+- Fixed Guild Manager roster and sync issues.
 
 ## 1.2.0
-- Added **Guild Manager** - track main/alt relationships for guild members, with a full roster panel, per-character detail view (join date, last seen, roles, nickname), and activity log (joins, leaves, promotions, demotions).
-  - Peer-to-peer sync via addon messages keeps data consistent across guild members running MysteriousQoL.
-  - Import/export support for sharing data outside of sync.
-  - Communities integration: displays main/alt info in community member tooltips.
-- Minimap button right-click now opens a small menu (Open Settings / Guild Manager / Hide Button) instead of hiding immediately.
-- **Skyriding Vigor Tracker** no longer runs an OnUpdate tick while not skyriding.
+- Added Guild Manager and expanded minimap, skyriding, and automation support.
 
 ## 1.1.3
-- Added **Dive Reminder** - shows a large bouncing DIVE warning while skyriding when the Hungering Presence debuff is active.
-- **Class Buff Reminder** now only checks group members for missing buffs when inside an instance.
+- Added Dive Reminder and limited group class-buff checks to instances.
 
 ## 1.1.2
-- Better minimap icon
+- Improved the minimap icon.
 
 ## 1.1.1
-- Added Vendor Sound
-- Code Cleanup
+- Added Vendor Sound and general cleanup.
 
-## 1.1.0 -Settings Revamp & New Features
-Major overhaul of the settings system, code cleanup, and several new features.
-
-### New Features
-- **Custom Settings UI** - replaced the native WoW Settings panel with a custom teal-themed settings frame. Accessed via `/mqol` or the minimap button.
-- **Chat Copy Button** - adds a small "C" button to each chat frame. Click to open a window with selectable, copyable chat text.
-- **Mail Reminder** - plays a sound on initial login if you have unread mail. Does not fire on `/reload` or zone transitions.
-- **Skyriding Vigor Tracker** - shows a vigor charge bar and speed display while skyriding. Options for Second Wind overlay, Whirling Surge cooldown, speed text, and auto-hide when full and grounded.
-- **Hide Alert Popups** - hides achievement, loot, and other alert notifications.
-- **Hide Event Toasts** - hides event notifications.
-- **Hide Talking Head** - hides the NPC talking head dialog frame.
-- **Hide Zone Text** - hides the zone name popup when entering a new area.
-- **Auto-Accept Quests** - automatically accepts quests from NPCs. Hold Alt to bypass.
-- **Auto-Select Gossip** - automatically selects the gossip option when an NPC only has one. Hold Alt to bypass.
-- **Auto Turn-In Quests** - automatically turns in completed quests. Only auto-selects reward if there is one or no choice. Hold Alt to bypass.
-- **Auto-Slot Keystone** - automatically places your Mythic+ keystone when the Challenge Mode frame opens.
-- **AH: Current Expansion Only** - automatically enables the Current Expansion filter when opening the Auction House.
-- **Easy Item Destroy** - auto-fills the DELETE confirmation text so you can just click the button.
-- **Faster Auto-Loot** - rapidly loots all items instead of waiting for the default loot animation.
-- **Suppress Loot Warnings** - auto-confirms bind-on-pickup, loot roll, and trade timer removal dialogs.
-- **Skip Queue Confirm** - auto-clicks Sign Up in the group finder application dialog. Hold Ctrl to see the dialog.
-- **Max Camera Distance** - sets camera distance to maximum (2.6x zoom out) on login.
-- **Release Protection** - blocks the release button in dungeons and raids. Hold Alt for 1 second to release.
-- **Minimap Button** - toggleable minimap button with drag repositioning and right-click to hide.
-
-### Improvements
-- All settings options sorted alphabetically within each category.
-- Shared bouncing reminder factory (`MI_CreateBouncingReminder`) eliminates duplicated frame boilerplate across all reminder modules.
-- Removed all dead code from the old native Settings API (`RegisterSettings` functions, `Core/Settings.lua`).
-- All addon functions follow `MI_` naming convention.
-- Minimap button reduced in size for a cleaner look.
-- Right-click minimap button to hide it; prints a chat reminder to use `/mqol` to re-enable.
-- Chat copy uses WoW's `StripHyperlinks` for reliable text cleaning.
+## 1.1.0
+- Rebuilt settings and added Chat Copy, Mail Reminder, skyriding, UI visibility controls, and major automation options.
 
 ## 1.0.12
-- Added **Repair Reminder** - shows a bouncing center-screen warning when any equipped gear drops to 50% durability (yellow).
-- Added **Hide Social Button** - option to hide the Quick Join toast button near the chat window.
-- Added addon icon properly this time.
+- Added Repair Reminder and Hide Social Button.
 
 ## 1.0.11
-- **Zoomies Sound** now plays while the speed buff is active and stops when it ends. Loops if the buff outlasts the sound file. Added Burning Rush (Warlock) support.
-- Aspect of the Cheetah now tracks both the initial burst and lingering speed buff seamlessly.
-- **Class Buff Reminder** now suppressed while flying (skyriding).
-- **No Pet / Pet Idle Reminder** now supports Unholy Death Knights.
+- Improved Zoomies and added Burning Rush support.
 
 ## 1.0.10
-- Added **Overload Reminder** - shows a bouncing "USE OVERLOAD!" warning when you start mining or herbing with your Overload spell off cooldown. Supports both Midnight Mining and Herb Gathering.
-- Added **Don't Release Reminder** now split into its own file under Reminders/.
-- Refactored Reminders into separate files: BuffReminder, PetReminder, DeathReminder, OverloadReminder.
-- Code cleanup: removed unnecessary nil guards, simplified animation resets.
+- Added Overload Reminder and split reminders into modules.
 
 ## 1.0.9
-- Added **Don't Release Reminder** - shows a large bouncing "Don't release you dolt!" message when you die in a raid instance while in a raid group.
-- Added **Shame Sound** - plays a sound when you release spirit in a raid instance. Does not fire for healer rezzes.
+- Added Don't Release Reminder and Shame Sound.
 
 ## 1.0.8
-- Added **Combat Reminders** - center-screen visual indicators for things you shouldn't forget:
-  - **Class Buff Reminder** - pulsing icon when your class buff (Mark of the Wild, Arcane Intellect, Power Word: Fortitude, Battle Shout, Blessing of the Bronze, or Skyfury) is missing from you or any group member. Suppressed while dead, mounted, in a vehicle, or on a taxi.
-  - **No Pet Reminder** - bouncing center-screen warning when you have no active pet (Warlocks, BM/Survival Hunters).
-  - **Pet Idle Reminder** - bouncing center-screen warning when your pet is alive but not attacking while you're in combat.
-- Auto Sell Greys now prints the total value of items sold to chat.
+- Added combat reminders and improved Auto Sell Greys.
 
 ## 1.0.7
-- Added **Vendor Automation** - automatically repairs gear and sells grey items when visiting a merchant.
-  - **Auto Repair** - repairs all equipped items on merchant open, prints cost to chat.
-  - **Use Guild Bank for Repairs** - optionally draws repair costs from the guild bank.
-  - **Auto Sell Greys** - sells all poor-quality items on merchant open.
+- Added vendor automation.
 
 ## 1.0.6
 - Bug fixes and stability improvements.
 
 ## 1.0.5
-- Added **Zoomies Sound** - plays a sound on Aspect of the Cheetah, Dash, or Divine Steed.
-- Added **Roll Sound** - plays a random sound on Roll or Chi Torpedo.
-- Added **Stealth Sound** - plays a sound on Stealth or Prowl.
+- Added Zoomies, Roll, and Stealth sounds.
 
 ## 1.0.4
-- Added **Mouse Ring** - configurable ring drawn around the cursor. Options: size, class color tint, hide center dot, only in combat, only on right-click, cast progress ring.
-- Added **Blink Sound** - plays a DBZ sound on Blink, Shimmer, or Shift.
+- Added Mouse Ring and Blink Sound.
 
 ## 1.0.3
 - Bug fixes.
 
 ## 1.0.2
-- Added **Bloodlust Sound** - plays a sound when Bloodlust/Heroism/Time Warp/Ancient Hysteria/Primal Rage/Fury of the Aspects is applied to you, detected via Sated-family debuffs.
+- Added Bloodlust Sound.
 
 ## 1.0.1
-- Added **Batman Teleport Sound** - plays the Batman theme when zoning in via hearthstone, mage portal, or toy.
+- Added Batman Teleport Sound.
 
 ## 1.0.0
-- Initial release.
-- Added **Owen Wilson Loot Sounds** - plays a random Owen Wilson "wow" clip when a loot window opens.
+- Initial release with Owen Wilson Loot Sounds.

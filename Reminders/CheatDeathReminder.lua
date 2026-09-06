@@ -29,7 +29,7 @@ function addon.MI_CheatDeathReminder_Update()
     end
     local active = isCheatDeathActive()
     if active and not wasActive then
-        PlaySoundFile(SOUND, "Master")
+        PlaySoundFile(SOUND, addon.db.sound_channel)
     end
     wasActive = active
 end

@@ -1,12 +1,12 @@
 local _, addon = ...
 
 local CLASS_BUFFS = {
-    DRUID   = { spellID = 1126,   label = "Mark of the Wild" },
-    MAGE    = { spellID = 1459,   label = "Arcane Intellect" },
-    PRIEST  = { spellID = 21562,  label = "Power Word: Fortitude" },
-    WARRIOR = { spellID = 6673,   label = "Battle Shout" },
-    EVOKER  = { spellID = 381732, label = "Blessing of the Bronze" },
-    SHAMAN  = { spellID = 462854, label = "Skyfury" },
+    DRUID   = { spellID = 1126 },
+    MAGE    = { spellID = 1459 },
+    PRIEST  = { spellID = 21562 },
+    WARRIOR = { spellID = 6673 },
+    EVOKER  = { spellID = 381732 },
+    SHAMAN  = { spellID = 462854 },
 }
 
 local function isSuppressed()
@@ -18,8 +18,10 @@ local function isSuppressed()
         or IsResting()
 end
 
-local function anyoneMissingBuff(spellID, spellName)
+local function anyoneMissingBuff(spellID)
     if not C_UnitAuras.GetPlayerAuraBySpellID(spellID) then return true end
+    local spellName = C_Spell.GetSpellName(spellID)
+    if not spellName then return true end
     local numMembers = GetNumGroupMembers()
     if numMembers > 0 and IsInInstance() then
         local inRaid = IsInRaid()
@@ -39,7 +41,7 @@ local function getBuffReminder()
     local entry = CLASS_BUFFS[addon.playerClass]
     if not entry then return nil end
     if isSuppressed() then return nil end
-    if not anyoneMissingBuff(entry.spellID, entry.label) then return nil end
+    if not anyoneMissingBuff(entry.spellID) then return nil end
     return entry
 end
 

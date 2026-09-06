@@ -40,13 +40,45 @@ local prevSpeed      = 0
 local elapsed        = 0
 local lastColorState = nil
 local isUpdating     = false
+local isDragging     = false
+local mouseEnabled   = false
+local secondaryStateDirty = true
+local secondWindBonusCharges = 0
+local lastSecondWindSetting
+local lastSecondWindFilled
+local lastSurgeSetting
+local lastSurgeStart
+local lastSurgeDuration
+local lastSurgeVisible
 
 local eventFrame
 local mainFrame, speedBar, speedText
 local chargeBars     = {}
+local lastChargeValues = {}
 local chargeDividers = {}
 local secondWindBars = {}
 local surgeFrame, surgeCooldown, surgeBorder
+
+local function FinishDragging()
+    if not mainFrame or not isDragging then return end
+    isDragging = false
+    mainFrame:StopMovingOrSizing()
+
+    local point, _, _, x, y = mainFrame:GetPoint()
+    addon.db.ui_dragonriding_posPoint = point
+    addon.db.ui_dragonriding_posX = x
+    addon.db.ui_dragonriding_posY = y
+end
+
+local function UpdateMouseInteraction(forceDisabled)
+    if not mainFrame then return end
+    local enable = not forceDisabled and IsAltKeyDown() == true
+    if not enable then FinishDragging() end
+    if mouseEnabled ~= enable then
+        mouseEnabled = enable
+        mainFrame:EnableMouse(enable)
+    end
+end
 
 local function UpdateLayout()
     if not mainFrame then return end
@@ -155,21 +187,32 @@ end
 local function UpdateCharges(charges, maxCharges, startTime, duration)
     local now = GetTime()
     for i = 1, NUM_CHARGES do
+        local value
         if i > maxCharges then
-            chargeBars[i]:SetValue(0)
+            value = 0
         elseif i <= charges then
-            chargeBars[i]:SetValue(1)
+            value = 1
         elseif i == charges + 1 and duration > 0 and startTime > 0 then
             local progress = (now - startTime) / duration
-            chargeBars[i]:SetValue(math.min(progress, 1))
+            value = math.min(progress, 1)
         else
-            chargeBars[i]:SetValue(0)
+            value = 0
+        end
+
+        if lastChargeValues[i] ~= value then
+            lastChargeValues[i] = value
+            chargeBars[i]:SetValue(value)
         end
     end
 end
 
 local function UpdateSecondWind(totalFilled)
-    if not addon.db.ui_dragonriding_showSecondWind then
+    local show = addon.db.ui_dragonriding_showSecondWind
+    local filled = show and totalFilled or 0
+    if lastSecondWindFilled == filled then return end
+    lastSecondWindFilled = filled
+
+    if not show then
         for i = 1, NUM_CHARGES do
             secondWindBars[i]:SetValue(0)
         end
@@ -182,20 +225,36 @@ end
 
 local function UpdateWhirlingSurge(startTime, duration)
     if not addon.db.ui_dragonriding_showWhirlingSurge or not surgeFrame then
-        if surgeFrame then surgeFrame:Hide() end
+        if surgeFrame and lastSurgeVisible ~= false then surgeFrame:Hide() end
+        lastSurgeVisible = false
+        lastSurgeStart = nil
+        lastSurgeDuration = nil
         return
     end
-    surgeFrame:Show()
+
+    if lastSurgeVisible ~= true then surgeFrame:Show() end
+    lastSurgeVisible = true
+    if startTime == lastSurgeStart and duration == lastSurgeDuration then return end
+    lastSurgeStart = startTime
+    lastSurgeDuration = duration
+
     if startTime > 0 and duration > 0 then
         surgeCooldown:SetCooldown(startTime, duration)
+    else
+        surgeCooldown:Clear()
     end
 end
 
 local function HideAll()
+    UpdateMouseInteraction(true)
     if mainFrame then mainFrame:Hide() end
     if surgeFrame then surgeFrame:Hide() end
     prevSpeed      = 0
     lastColorState = nil
+    wipe(lastChargeValues)
+    lastSecondWindFilled = nil
+    lastSurgeVisible = nil
+    secondaryStateDirty = true
 end
 
 local function RunUpdate()
@@ -207,6 +266,8 @@ local function RunUpdate()
     if addon.db.ui_dragonriding_hideGroundedFull and not isGliding and charges >= maxCharges then
         mainFrame:Hide()
         if surgeFrame then surgeFrame:Hide() end
+        lastSurgeVisible = nil
+        secondaryStateDirty = true
         return
     end
 
@@ -215,22 +276,33 @@ local function RunUpdate()
     UpdateCharges(charges, maxCharges, startTime, duration)
     ApplyColors(isThrill)
 
-    if addon.db.ui_dragonriding_showSecondWind then
-        local swData = C_Spell.GetSpellCharges(SECOND_WIND_SPELL)
-        UpdateSecondWind(charges + (swData and swData.currentCharges or 0))
-    else
-        UpdateSecondWind(0)
+    local showSecondWind = addon.db.ui_dragonriding_showSecondWind
+    local showSurge = addon.db.ui_dragonriding_showWhirlingSurge
+    if showSecondWind ~= lastSecondWindSetting or showSurge ~= lastSurgeSetting then
+        lastSecondWindSetting = showSecondWind
+        lastSurgeSetting = showSurge
+        secondaryStateDirty = true
     end
 
-    if addon.db.ui_dragonriding_showWhirlingSurge then
+    if secondaryStateDirty and showSecondWind then
+        local swData = C_Spell.GetSpellCharges(SECOND_WIND_SPELL)
+        secondWindBonusCharges = swData and swData.currentCharges or 0
+    end
+    UpdateSecondWind(charges + secondWindBonusCharges)
+
+    if secondaryStateDirty and showSurge then
         local surgeData = C_Spell.GetSpellCooldown(WHIRLING_SURGE_SPELL)
         UpdateWhirlingSurge(surgeData and surgeData.startTime or 0, surgeData and surgeData.duration or 0)
-    else
+    elseif not showSurge then
         UpdateWhirlingSurge(0, 0)
     end
+    secondaryStateDirty = false
 end
 
 local function OnUpdate(_, dt)
+    -- The tracker only accepts input while Alt is held, so it does not block
+    -- clicks intended for action bars or world frames underneath it.
+    UpdateMouseInteraction(false)
     elapsed = elapsed + dt
     if elapsed < THROTTLE then return end
     elapsed = 0
@@ -244,6 +316,8 @@ local function CheckMount()
             elapsed    = 0
             eventFrame:SetScript("OnUpdate", OnUpdate)
         end
+        secondaryStateDirty = true
+        UpdateMouseInteraction(false)
         RunUpdate()
     else
         isUpdating = false
@@ -255,8 +329,12 @@ end
 local function OnEvent(_, event)
     if event == "PLAYER_MOUNT_DISPLAY_CHANGED" or event == "UPDATE_SHAPESHIFT_FORM" then
         -- Defer: GetGlidingInfo() hasn't settled yet at the instant these events fire.
+        secondaryStateDirty = true
         C_Timer.After(0.15, CheckMount)
     elseif isUpdating then
+        if event == "SPELL_UPDATE_CHARGES" or event == "SPELL_UPDATE_COOLDOWN" or event == "UNIT_AURA" then
+            secondaryStateDirty = true
+        end
         RunUpdate()
     end
 end
@@ -267,15 +345,15 @@ local function BuildUI()
     mainFrame:SetFrameLevel(100)
     mainFrame:SetClampedToScreen(true)
     mainFrame:SetMovable(true)
-    mainFrame:EnableMouse(true)
+    mainFrame:EnableMouse(false)
     mainFrame:RegisterForDrag("LeftButton")
-    mainFrame:SetScript("OnDragStart", mainFrame.StartMoving)
+    mainFrame:SetScript("OnDragStart", function(self)
+        if not IsAltKeyDown() then return end
+        isDragging = true
+        self:StartMoving()
+    end)
     mainFrame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, _, x, y = self:GetPoint()
-        addon.db.ui_dragonriding_posPoint = point
-        addon.db.ui_dragonriding_posX = x
-        addon.db.ui_dragonriding_posY = y
+        FinishDragging()
     end)
 
     -- Restore saved position
@@ -359,6 +437,7 @@ function addon.MI_Dragonriding_Init()
         eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
         eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
         eventFrame:RegisterEvent("SPELL_UPDATE_CHARGES")
+        eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
         eventFrame:RegisterUnitEvent("UNIT_AURA", "player")
         CheckMount()
     end
@@ -370,6 +449,7 @@ function addon.MI_Dragonriding_SetEnabled(v)
         eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
         eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
         eventFrame:RegisterEvent("SPELL_UPDATE_CHARGES")
+        eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
         eventFrame:RegisterUnitEvent("UNIT_AURA", "player")
         CheckMount()
     else

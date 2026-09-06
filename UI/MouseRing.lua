@@ -191,19 +191,37 @@ runner:SetScript("OnUpdate", function()
     end
 end)
 
-local function enableRing()
-    if not ringFrame then ringFrame = createRingFrame() end
-    applyRingStyle()
-    runner:Show()
-end
-
-local function disableRing()
-    runner:Hide()
+local function hideRingVisuals()
     if ringFrame then
         ringFrame:Hide()
         ringFrame.castRing:Hide()
     end
     castRingSetStart = nil
+    lastCx, lastCy = nil, nil
+end
+
+local function refreshRunnerVisibility()
+    local db = addon.db
+    local shouldRun = db.ui_mouseRing_enabled
+        and (not db.ui_mouseRing_onlyInCombat or UnitAffectingCombat("player"))
+
+    if shouldRun then
+        runner:Show()
+    else
+        runner:Hide()
+        hideRingVisuals()
+    end
+end
+
+local function enableRing()
+    if not ringFrame then ringFrame = createRingFrame() end
+    applyRingStyle()
+    refreshRunnerVisibility()
+end
+
+local function disableRing()
+    runner:Hide()
+    hideRingVisuals()
 end
 
 -- Refresh ring visibility when combat state changes (for "only in combat" mode)
@@ -211,9 +229,7 @@ local evtFrame = CreateFrame("Frame")
 evtFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 evtFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 evtFrame:SetScript("OnEvent", function()
-    if addon.db.ui_mouseRing_enabled and addon.db.ui_mouseRing_onlyInCombat then
-        if not runner:IsShown() then runner:Show() end
-    end
+    refreshRunnerVisibility()
 end)
 
 -- Expose for custom settings UI
@@ -222,6 +238,9 @@ function addon.MI_MouseRing_SetEnabled(v)
 end
 function addon.MI_MouseRing_ApplyStyle()
     applyRingStyle()
+end
+function addon.MI_MouseRing_RefreshVisibility()
+    refreshRunnerVisibility()
 end
 
 -- Called from MysteriousQoL.lua after InitDB.

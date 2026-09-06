@@ -6,7 +6,7 @@ local function getDeathReminder()
     if not IsInRaid() then return false end
     local _, instanceType, difficultyID = GetInstanceInfo()
     if instanceType ~= "raid" then return false end
-    local _, _, _, _, _, _, isLFR = GetDifficultyInfo(difficultyID)
+    local _, _, _, _, _, _, _, isLFR = GetDifficultyInfo(difficultyID)
     return not isLFR
 end
 

@@ -1,5 +1,59 @@
 local _, addon = ...
 
+local CURRENT_DB_VERSION = 1
+
+local VALID_SOUND_CHANNELS = {
+    Master   = true,
+    SFX      = true,
+    Music    = true,
+    Ambience = true,
+    Dialog   = true,
+}
+
+local VALID_BLOODLUST_SOUNDS = {
+    ["r2d2.ogg"] = true,
+    ["wei.ogg"]  = true,
+}
+
+local VALID_FRAME_POINTS = {
+    TOPLEFT     = true,
+    TOP         = true,
+    TOPRIGHT    = true,
+    LEFT        = true,
+    CENTER      = true,
+    RIGHT       = true,
+    BOTTOMLEFT  = true,
+    BOTTOM      = true,
+    BOTTOMRIGHT = true,
+}
+
+-- Stable priority for collapsing the pre-1.3 per-feature channel settings into
+-- the single shared channel. The first valid non-default value wins; if every
+-- legacy value is Master, Master is retained.
+local LEGACY_SOUND_CHANNEL_KEYS = {
+    "fun_owenWilson_channel",
+    "fun_batman_channel",
+    "fun_bloodlust_channel",
+    "fun_blink_channel",
+    "fun_sneaky_channel",
+    "fun_rolling_channel",
+    "fun_zoomies_channel",
+    "fun_victory_channel",
+    "fun_vendorSound_channel",
+    "combat_petMissingSound_channel",
+}
+
+local OBSOLETE_GUILD_KEYS = {
+    "guildData",
+    "guild_alts_enabled",
+    "guild_chat_showMain",
+    "guild_log_enabled",
+    "guild_log_maxEntries",
+    "guild_sync_enabled",
+    "guild_inactive_days",
+    "guild_panel_scale",
+}
+
 -- Default values for all settings. Each feature owns its own keys.
 addon.defaults = {
     -- Global
@@ -19,6 +73,7 @@ addon.defaults = {
     fun_zoomies_steed        = true,
     fun_zoomies_rush         = true,
     fun_vendorSound_enabled  = false,
+    fun_victory_enabled      = false,
     -- Combat
     combat_buffReminder_enabled      = false,
     combat_petReminder_enabled       = false,
@@ -28,6 +83,7 @@ addon.defaults = {
     combat_overloadReminder_enabled  = false,
     combat_mulchReminder_enabled     = false,
     combat_repairReminder_enabled    = false,
+    combat_readyCheck_enabled        = false,
     combat_diveReminder_enabled      = false,
 
     combat_mailReminder_enabled  = false,
@@ -47,6 +103,10 @@ addon.defaults = {
     general_autoGossipSelect     = false,
     general_ahCurrentExpansion   = false,
     general_maxCameraDistance    = false,
+
+    -- UI > Gear
+    ui_bagUpgrade_enabled         = false,
+    ui_missingEnchant_enabled     = false,
 
     -- UI > Mouse Ring
     ui_mouseRing_enabled          = false,
@@ -89,15 +149,137 @@ addon.defaults = {
     settings_panel_scale          = 1.0,
 }
 
--- Initialize the SavedVariables-backed DB, filling in any missing keys with defaults.
--- Called from ADDON_LOADED in MysteriousQoL.lua.
-function addon:MI_InitDB()
-    MysteriousQoLDB = MysteriousQoLDB or {}
-    for k, v in pairs(self.defaults) do
-        if MysteriousQoLDB[k] == nil then
-            MysteriousQoLDB[k] = v
+local NUMBER_RULES = {
+    ui_mouseRing_size             = { min = 20,    max = 100 },
+    ui_dragonriding_barWidth      = { min = 8,     max = 200 },
+    ui_dragonriding_speedHeight   = { min = 4,     max = 100 },
+    ui_dragonriding_chargeHeight  = { min = 4,     max = 100 },
+    ui_dragonriding_gap           = { min = 0,     max = 50 },
+    ui_dragonriding_posX          = { min = -10000, max = 10000 },
+    ui_dragonriding_posY          = { min = -10000, max = 10000 },
+    ui_minimapButton_angle        = { min = -360,  max = 360 },
+    settings_panel_scale          = { min = 0.6,   max = 2.0 },
+}
+
+local function isFiniteNumber(value)
+    return type(value) == "number"
+        and value == value
+        and value > -math.huge
+        and value < math.huge
+end
+
+local function clamp(value, minimum, maximum)
+    return math.max(minimum, math.min(maximum, value))
+end
+
+local function migrateLegacySoundChannel(db)
+    if VALID_SOUND_CHANNELS[db.sound_channel] and db.sound_channel ~= "Master" then return end
+
+    local fallback = VALID_SOUND_CHANNELS[db.sound_channel] and db.sound_channel or nil
+    for _, key in ipairs(LEGACY_SOUND_CHANNEL_KEYS) do
+        local channel = db[key]
+        if VALID_SOUND_CHANNELS[channel] then
+            fallback = fallback or channel
+            if channel ~= "Master" then
+                db.sound_channel = channel
+                return
+            end
         end
     end
+    db.sound_channel = fallback or "Master"
+end
+
+local function removeObsoleteKeys(db)
+    for _, key in ipairs(LEGACY_SOUND_CHANNEL_KEYS) do
+        db[key] = nil
+    end
+    for _, key in ipairs(OBSOLETE_GUILD_KEYS) do
+        db[key] = nil
+    end
+end
+
+local MIGRATIONS = {
+    [1] = function(db)
+        migrateLegacySoundChannel(db)
+        removeObsoleteKeys(db)
+    end,
+}
+
+local function getDBVersion(db)
+    local version = db.dbVersion
+    if not isFiniteNumber(version) or version < 0 or version % 1 ~= 0 then
+        return 0
+    end
+    return version
+end
+
+local function runMigrations(db)
+    local version = getDBVersion(db)
+    if version < CURRENT_DB_VERSION then
+        for nextVersion = version + 1, CURRENT_DB_VERSION do
+            local migration = MIGRATIONS[nextVersion]
+            if migration then migration(db) end
+        end
+        db.dbVersion = CURRENT_DB_VERSION
+    end
+
+    -- Enforce removals even if a beta build stamped the current version before
+    -- completing cleanup. Preserve a future schema marker when downgrading.
+    removeObsoleteKeys(db)
+    if version <= CURRENT_DB_VERSION then
+        db.dbVersion = CURRENT_DB_VERSION
+    end
+end
+
+local function validateDB(db, defaults)
+    for key, default in pairs(defaults) do
+        if type(db[key]) ~= type(default) then
+            db[key] = default
+        end
+    end
+
+    if not VALID_SOUND_CHANNELS[db.sound_channel] then
+        db.sound_channel = defaults.sound_channel
+    end
+    if not VALID_BLOODLUST_SOUNDS[db.fun_bloodlust_sound] then
+        db.fun_bloodlust_sound = defaults.fun_bloodlust_sound
+    end
+    if not VALID_FRAME_POINTS[db.ui_dragonriding_posPoint] then
+        db.ui_dragonriding_posPoint = defaults.ui_dragonriding_posPoint
+    end
+
+    for key, rule in pairs(NUMBER_RULES) do
+        local value = db[key]
+        if not isFiniteNumber(value) then
+            value = defaults[key]
+        end
+        db[key] = clamp(value, rule.min, rule.max)
+    end
+
+    -- Optional state used to restore the camera CVar when the feature is
+    -- disabled. It is deliberately absent until a value has been captured.
+    local previous = db.general_maxCameraDistance_previous
+    if previous ~= nil then
+        if isFiniteNumber(previous) then
+            db.general_maxCameraDistance_previous = clamp(previous, 1.0, 2.6)
+        else
+            db.general_maxCameraDistance_previous = nil
+        end
+    end
+    if db.general_maxCameraDistance and db.general_maxCameraDistance_previous == nil then
+        -- Legacy releases forced 2.6 without recording the value they replaced.
+        db.general_maxCameraDistance_previous = 1.9
+    end
+end
+
+-- Initialize and validate the account-wide SavedVariables-backed DB.
+-- Called from ADDON_LOADED in MysteriousQoL.lua.
+function addon:MI_InitDB()
+    if type(MysteriousQoLDB) ~= "table" then
+        MysteriousQoLDB = {}
+    end
+    runMigrations(MysteriousQoLDB)
+    validateDB(MysteriousQoLDB, self.defaults)
     self.db = MysteriousQoLDB
 end
 

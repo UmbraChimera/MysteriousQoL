@@ -10,6 +10,27 @@ local FONT          = "Fonts\\FRIZQT__.TTF"
 
 local copyFrame, copyEdit, copyScroll
 
+local function ResizeCopyEdit()
+    if not copyEdit or not copyScroll then return end
+
+    -- A ScrollFrame derives its range from the scroll child's dimensions.  A
+    -- multiline EditBox does not grow itself to match its text, so explicitly
+    -- size it from the number of wrapped lines after its final width is known.
+    local width = math.max(1, copyScroll:GetWidth() - 4)
+    copyEdit:SetWidth(width)
+
+    local _, fontHeight = copyEdit:GetFont()
+    local spacing = copyEdit:GetSpacing() or 0
+    local _, _, insetTop, insetBottom = copyEdit:GetTextInsets()
+    local lines = math.max(1, copyEdit:GetNumLines() or 1)
+    local textHeight = lines * (fontHeight or 12)
+        + math.max(0, lines - 1) * spacing
+        + (insetTop or 0) + (insetBottom or 0) + 4
+
+    copyEdit:SetHeight(math.max(copyScroll:GetHeight(), textHeight))
+    copyScroll:UpdateScrollChildRect()
+end
+
 local function BuildCopyFrame()
     if copyFrame then return end
 
@@ -73,7 +94,10 @@ local function BuildCopyFrame()
     copyEdit:SetAutoFocus(false)
     copyEdit:SetFont(FONT, 12, "")
     copyEdit:SetTextColor(1, 1, 1, 1)
+    copyEdit:SetJustifyH("LEFT")
+    copyEdit:SetJustifyV("TOP")
     copyEdit:SetWidth(COPY_WIDTH - 40)
+    copyEdit:SetHeight(1)
     copyEdit:SetScript("OnEscapePressed", function() copyFrame:Hide() end)
     copyEdit:SetScript("OnTextChanged", function(self)
         if self.suppress then return end
@@ -85,6 +109,9 @@ local function BuildCopyFrame()
         end
     end)
     copyScroll:SetScrollChild(copyEdit)
+    copyScroll:HookScript("OnSizeChanged", function()
+        C_Timer.After(0, ResizeCopyEdit)
+    end)
 end
 
 local function CleanText(text)
@@ -146,8 +173,9 @@ local function OpenCopyWindow(chatFrame)
     copyFrame:Show()
     copyEdit:SetFocus()
     copyEdit:HighlightText()
-    -- Scroll to bottom
+    -- Let text wrapping settle before calculating the scroll range.
     C_Timer.After(0, function()
+        ResizeCopyEdit()
         copyScroll:SetVerticalScroll(copyScroll:GetVerticalScrollRange())
     end)
 end

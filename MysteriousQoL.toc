@@ -1,7 +1,7 @@
-## Interface: 120001, 120100
+## Interface: 120001, 120007, 120100
 ## Title: MysteriousQoL
 ## Notes: Mysterious quality of life improvements
-## Version: 1.2.2
+## Version: 1.4.0
 ## SavedVariables: MysteriousQoLDB
 ## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
 
@@ -31,6 +31,8 @@ Fun/VendorSound.lua
 UI/MouseRing.lua
 UI/HideElements.lua
 UI/ChatCopy.lua
+UI/Changelog.lua
+UI/GearIndicators.lua
 UI/Dragonriding.lua
 Reminders/BuffReminder.lua
 Reminders/PetReminder.lua
@@ -40,6 +42,7 @@ Reminders/CheatDeathReminder.lua
 Reminders/OverloadReminder.lua
 Reminders/MulchReminder.lua
 Reminders/RepairReminder.lua
+Reminders/ReadyCheck.lua
 Reminders/DiveReminder.lua
 Reminders/MailReminder.lua
 Reminders/Reminders.lua

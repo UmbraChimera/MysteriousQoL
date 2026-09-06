@@ -9,6 +9,28 @@ local channelOpts = {
     { text = "Dialog",        value = "Dialog" },
 }
 
+local CAMERA_DISTANCE_CVAR = "cameraDistanceMaxZoomFactor"
+local MAX_CAMERA_DISTANCE = 2.6
+
+local function ApplyMaxCameraDistance(enabled)
+    if enabled then
+        if addon.db.general_maxCameraDistance_previous == nil then
+            local previous = tonumber(GetCVar(CAMERA_DISTANCE_CVAR))
+            if previous then
+                addon.db.general_maxCameraDistance_previous = previous
+            end
+        end
+        SetCVar(CAMERA_DISTANCE_CVAR, MAX_CAMERA_DISTANCE)
+        return
+    end
+
+    local previous = tonumber(addon.db.general_maxCameraDistance_previous)
+    if previous then
+        SetCVar(CAMERA_DISTANCE_CVAR, previous)
+    end
+    addon.db.general_maxCameraDistance_previous = nil
+end
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(self, _, name)
@@ -27,6 +49,7 @@ frame:SetScript("OnEvent", function(self, _, name)
         UI.Checkbox("ui_minimapButton_enabled", "Show Minimap Button",
             "Toggles the MysteriousQoL minimap button.",
             addon.MI_MinimapButton_SetShown)
+        UI.Button("Reset Settings Panel", addon.MI_SettingsUI_ResetLayout)
 
         UI.Header("Automation")
         UI.Checkbox("general_ahCurrentExpansion", "AH: Current Expansion Only",
@@ -44,14 +67,8 @@ frame:SetScript("OnEvent", function(self, _, name)
 
         UI.Header("Camera")
         UI.Checkbox("general_maxCameraDistance", "Max Camera Distance",
-            "Sets camera distance to maximum (2.6x zoom out). Applied on login.",
-            function(v)
-                if v then
-                    SetCVar("cameraDistanceMaxZoomFactor", 2.6)
-                else
-                    SetCVar("cameraDistanceMaxZoomFactor", 1.9)
-                end
-            end)
+            "Sets camera distance to maximum (2.6x zoom out). Your previous value is restored when disabled.",
+            ApplyMaxCameraDistance)
 
         UI.Header("Loot")
         UI.Checkbox("general_easyDestroy", "Easy Item Destroy",
@@ -75,6 +92,14 @@ frame:SetScript("OnEvent", function(self, _, name)
     end)
 
     UI.RegisterCategory("UI", function()
+        UI.Header("Gear")
+        UI.Checkbox("ui_bagUpgrade_enabled", "Bag Upgrade Arrows",
+            "Shows a green arrow at the bottom right of higher item-level gear in Blizzard's bags. Compares rings and trinkets with the lower equipped slot. Uses your class's primary armor type. Item level only; does not evaluate stats, set bonuses, or weapon combinations.",
+            addon.MI_GearIndicators_RefreshState)
+        UI.Checkbox("ui_missingEnchant_enabled", "Missing Enchant Highlights",
+            "Tints equipped items red in your character window when missing a permanent enchant. Checks Midnight head, shoulders, chest, legs, boots, rings, and weapons. Includes leg armor/spellthread; excludes shields, caster off-hands, and wands. Does not judge enchant quality or temporary oils.",
+            addon.MI_GearIndicators_RefreshState)
+
         UI.Header("Chat")
         UI.Checkbox("ui_chatCopy_enabled", "Chat Copy Button",
             "Adds a small copy button to each chat frame. Click to open a window with copyable chat text.",
@@ -82,19 +107,23 @@ frame:SetScript("OnEvent", function(self, _, name)
 
         UI.Header("Hide Elements")
         UI.Checkbox("ui_hideAlerts_enabled", "Hide Alert Popups",
-            "Hides achievement, loot, and other alert notifications.")
+            "Hides achievement, loot, and other alert notifications.",
+            addon.MI_HideElements_ApplyAlerts)
         UI.Checkbox("ui_hideErrors_enabled", "Hide Error Messages",
             "Hides the red UI error text (e.g. \"You don't have a pet.\", \"Out of range.\", \"Spell is not ready yet.\").",
             addon.MI_HideElements_ApplyErrors)
         UI.Checkbox("ui_hideEventToasts_enabled", "Hide Event Toasts",
-            "Hides event notifications.")
+            "Hides event notifications.",
+            addon.MI_HideElements_ApplyEventToasts)
         UI.Checkbox("ui_hideSocial_enabled", "Hide Social Button",
             "Hides the Quick Join toast button near the minimap.",
             addon.MI_HideElements_ApplySocial)
         UI.Checkbox("ui_hideTalkingHead_enabled", "Hide Talking Head",
-            "Hides the NPC talking head dialog frame.")
+            "Hides the NPC talking head dialog frame.",
+            addon.MI_HideElements_ApplyTalkingHead)
         UI.Checkbox("ui_hideZoneText_enabled", "Hide Zone Text",
-            "Hides the zone name popup when entering a new area.")
+            "Hides the zone name popup when entering a new area.",
+            addon.MI_HideElements_ApplyZoneText)
 
         UI.Header("Mouse Ring")
         UI.Checkbox("ui_mouseRing_enabled", "Mouse Ring",
@@ -106,7 +135,8 @@ frame:SetScript("OnEvent", function(self, _, name)
                   onChange = addon.MI_MouseRing_ApplyStyle },
                 { type = "checkbox", key = "ui_mouseRing_hideDot", label = "Hide Center Dot",
                   onChange = addon.MI_MouseRing_ApplyStyle },
-                { type = "checkbox", key = "ui_mouseRing_onlyInCombat", label = "Only Show In Combat" },
+                { type = "checkbox", key = "ui_mouseRing_onlyInCombat", label = "Only Show In Combat",
+                  onChange = addon.MI_MouseRing_RefreshVisibility },
                 { type = "checkbox", key = "ui_mouseRing_onlyOnRightClick", label = "Only Show On Right-Click",
                   tooltip = "Ring is visible only while the right mouse button is held." },
                 { type = "checkbox", key = "ui_mouseRing_useClassColor", label = "Use Class Color",
@@ -117,7 +147,7 @@ frame:SetScript("OnEvent", function(self, _, name)
 
         UI.Header("Skyriding")
         UI.Checkbox("ui_dragonriding_enabled", "Skyriding Vigor Tracker",
-            "Shows a vigor charge bar and speed display while skyriding.",
+            "Shows a vigor charge bar and speed display while skyriding. Hold Alt and drag the tracker to move it.",
             addon.MI_Dragonriding_SetEnabled,
             {
                 { type = "checkbox", key = "ui_dragonriding_showSpeed", label = "Show Speed Text",
@@ -144,7 +174,7 @@ frame:SetScript("OnEvent", function(self, _, name)
             "Shows a large center-screen warning when you die in a raid instance to stop you releasing.",
             refreshReminders)
         UI.Checkbox("combat_cheatDeathReminder_enabled", "Cheat Death Reminder",
-            "Shows a warning while in combat in an instance when Purgatory, Cheat Death, or Cauterize saves you.",
+            "Plays an audio cue while in combat in an instance when Purgatory, Cheat Death, Cauterize, or Last Resort saves you.",
             refreshReminders)
 
         UI.Header("Gathering")
@@ -155,9 +185,15 @@ frame:SetScript("OnEvent", function(self, _, name)
             "Shows a warning when you begin herbing and Imbued Mulch is in your bags and off cooldown.",
             refreshReminders)
 
+        UI.Header("Hungering Presence")
+        UI.Checkbox("combat_diveReminder_enabled", "Dive Reminder",
+            "Shows a large DIVE warning while skyriding when debuff 1251978 is active.",
+            refreshReminders)
+
         UI.Header("Mail")
         UI.Checkbox("combat_mailReminder_enabled", "Mail Reminder",
-            "Plays a sound on login if you have unread mail. Only triggers on initial login, not reloads.")
+            "Plays a sound on login if you have unread mail. Only triggers on initial login, not reloads.",
+            addon.MI_MailReminder_SetEnabled)
 
         UI.Header("Pet")
         UI.Checkbox("combat_petReminder_enabled", "No Pet Reminder",
@@ -169,14 +205,14 @@ frame:SetScript("OnEvent", function(self, _, name)
         UI.Checkbox("combat_petMissingSound_enabled", "No Pet Sound",
             "Plays a baby murloc sound when you try to cast a pet ability without an active pet.")
 
+        UI.Header("Ready Check")
+        UI.Checkbox("combat_readyCheck_enabled", "Ready Check Preflight",
+            "On a ready check, shows a personal checklist for durability, temporary weapon buffs, Well Fed, flask, and a Healthstone when a Warlock is in your group.",
+            addon.MI_ReadyCheck_SetEnabled)
+
         UI.Header("Repair")
         UI.Checkbox("combat_repairReminder_enabled", "Repair Reminder",
             "Shows a center-screen warning when any equipped gear drops to 50% durability (yellow).",
-            refreshReminders)
-
-        UI.Header("Hungering Presence")
-        UI.Checkbox("combat_diveReminder_enabled", "Dive Reminder",
-            "Shows a large DIVE warning while skyriding when debuff 1251978 is active.",
             refreshReminders)
     end)
 
@@ -191,7 +227,7 @@ frame:SetScript("OnEvent", function(self, _, name)
 
         UI.Header("Bloodlust")
         UI.Checkbox("fun_bloodlust_enabled", "Bloodlust Sound",
-            "Plays a sound when Bloodlust, Heroism, Time Warp, or any equivalent haste effect is applied to you.",
+            "Plays a sound in instances when Bloodlust, Heroism, Time Warp, or an equivalent haste effect is applied to you.",
             nil,
             {
                 { type = "dropdown", key = "fun_bloodlust_sound", label = "Sound Choice",
@@ -217,23 +253,32 @@ frame:SetScript("OnEvent", function(self, _, name)
         UI.Checkbox("fun_vendorSound_enabled", "Vendor Grey Sound",
             "Plays a money sound when grey items are sold, whether by the Auto-Sell option or the in-game Sell All Junk button.")
 
+        UI.Header("Victory")
+        UI.Checkbox("fun_victory_enabled", "Encounter Victory Sound",
+            "Plays a victory sound when you earn a tracked dungeon, raid, or Delve completion achievement inside an instance.",
+            addon.MI_Victory_SetEnabled)
+
         UI.Header("Zoomies")
         UI.Checkbox("fun_zoomies_enabled", "Zoomies Sound",
             "Plays a sound when you use a major speed ability. Toggle individual spells below.",
-            nil,
+            addon.MI_Zoomies_SetEnabled,
             {
                 { type = "checkbox", key = "fun_zoomies_cheetah",
                   label = "|cffAAD372Aspect of the Cheetah|r",
-                  tooltip = "Play zoomies for Aspect of the Cheetah (Hunter)." },
+                  tooltip = "Play zoomies for Aspect of the Cheetah (Hunter).",
+                  onChange = addon.MI_Zoomies_SetEnabled },
                 { type = "checkbox", key = "fun_zoomies_dash",
                   label = "|cffFF7C0ADash|r",
-                  tooltip = "Play zoomies for Dash (Druid)." },
+                  tooltip = "Play zoomies for Dash (Druid).",
+                  onChange = addon.MI_Zoomies_SetEnabled },
                 { type = "checkbox", key = "fun_zoomies_steed",
                   label = "|cffF48CBADivine Steed|r",
-                  tooltip = "Play zoomies for Divine Steed (Paladin)." },
+                  tooltip = "Play zoomies for Divine Steed (Paladin).",
+                  onChange = addon.MI_Zoomies_SetEnabled },
                 { type = "checkbox", key = "fun_zoomies_rush",
                   label = "|cff8788EEBurning Rush|r",
-                  tooltip = "Play zoomies for Burning Rush (Warlock)." },
+                  tooltip = "Play zoomies for Burning Rush (Warlock).",
+                  onChange = addon.MI_Zoomies_SetEnabled },
             })
     end)
 
@@ -245,11 +290,14 @@ frame:SetScript("OnEvent", function(self, _, name)
 
     -- Initialize features that need to be active on load
     addon.MI_MouseRing_Init()
+    addon.MI_GearIndicators_RefreshState()
     addon.MI_Dragonriding_Init()
     addon.MI_Reminders_Init()
+    addon.MI_ReadyCheck_Init()
+    addon.MI_MailReminder_Init()
     -- Apply CVars
     if addon.db.general_maxCameraDistance then
-        SetCVar("cameraDistanceMaxZoomFactor", 2.6)
+        ApplyMaxCameraDistance(true)
     end
 end)
 

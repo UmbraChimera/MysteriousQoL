@@ -29,18 +29,43 @@ local function playZoom()
     zoomHandle = select(2, PlaySoundFile(SOUND, addon.db.sound_channel))
 end
 
+local function stopZoom()
+    if pendingStop then
+        pendingStop:Cancel()
+        pendingStop = nil
+    end
+    if zoomTicker then
+        zoomTicker:Cancel()
+        zoomTicker = nil
+    end
+    if zoomHandle then
+        StopSound(zoomHandle)
+        zoomHandle = nil
+    end
+    zoomPlaying = false
+end
+
+local function hasActiveZoomBuff()
+    for spellID in pairs(MI_ZOOM_BUFFS) do
+        if isSpellEnabled(spellID) and C_UnitAuras.GetPlayerAuraBySpellID(spellID) then
+            return true
+        end
+    end
+    return false
+end
+
 local function startZoom()
     if pendingStop then pendingStop:Cancel(); pendingStop = nil end
-    if zoomPlaying then return end
+    if zoomPlaying or not addon.db.fun_zoomies_enabled then return end
     zoomPlaying = true
     playZoom()
     if zoomTicker then zoomTicker:Cancel() end
     zoomTicker = C_Timer.NewTicker(1, function()
         if not zoomPlaying or not addon.db.fun_zoomies_enabled then
-            if zoomTicker then zoomTicker:Cancel(); zoomTicker = nil end
+            stopZoom()
             return
         end
-        if zoomHandle and not C_Sound.IsPlaying(zoomHandle) then
+        if not zoomHandle or not C_Sound.IsPlaying(zoomHandle) then
             playZoom()
         end
     end)
@@ -52,32 +77,26 @@ local function requestStop()
     if pendingStop then pendingStop:Cancel() end
     pendingStop = C_Timer.NewTimer(0.7, function()
         pendingStop = nil
-        for id in pairs(MI_ZOOM_BUFFS) do
-            if isSpellEnabled(id) and C_UnitAuras.GetPlayerAuraBySpellID(id) then return end
-        end
-        zoomPlaying = false
-        if zoomTicker then zoomTicker:Cancel(); zoomTicker = nil end
-        if zoomHandle then
-            StopSound(zoomHandle)
-            zoomHandle = nil
-        end
+        if addon.db.fun_zoomies_enabled and hasActiveZoomBuff() then return end
+        stopZoom()
     end)
+end
+
+local function refreshZoomState()
+    if not addon.db.fun_zoomies_enabled then
+        stopZoom()
+    elseif hasActiveZoomBuff() then
+        startZoom()
+    elseif zoomPlaying then
+        requestStop()
+    end
 end
 
 local auraFrame = CreateFrame("Frame")
 auraFrame:RegisterUnitEvent("UNIT_AURA", "player")
-auraFrame:SetScript("OnEvent", function()
-    if not addon.db.fun_zoomies_enabled then return end
-    local anyActive = false
-    for spellID in pairs(MI_ZOOM_BUFFS) do
-        if isSpellEnabled(spellID) and C_UnitAuras.GetPlayerAuraBySpellID(spellID) then
-            anyActive = true
-            break
-        end
-    end
-    if anyActive and not zoomPlaying then
-        startZoom()
-    elseif not anyActive and zoomPlaying then
-        requestStop()
-    end
-end)
+auraFrame:SetScript("OnEvent", refreshZoomState)
+
+-- Settings callback for both the master toggle and per-spell child toggles.
+function addon.MI_Zoomies_SetEnabled()
+    refreshZoomState()
+end
