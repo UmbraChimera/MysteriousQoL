@@ -2,16 +2,52 @@ local _, addon = ...
 
 -- Central event dispatcher for all reminder modules.
 -- Each reminder exposes addon.MI_<Name>Reminder_Update() and is called on every refresh.
+--
+-- Modules are listed by name rather than called directly because each flavor's TOC
+-- loads a different set -Forever has no skyriding, Midnight gathering, or Cheat Death.
+-- Functions are resolved at call time so a module the TOC left out is simply skipped.
+
+-- Repair is the only reminder that works on both flavors. Everything else keys off
+-- retail spell IDs, so Forever loads none of it until those are redone.
+local UPDATE_FUNCS = {
+    "MI_RepairReminder_Update",
+}
+
+local ENABLE_KEYS = {
+    "combat_repairReminder_enabled",
+}
+
+if addon.RETAIL then
+    table.insert(UPDATE_FUNCS, "MI_BuffReminder_Update")
+    table.insert(UPDATE_FUNCS, "MI_PetReminder_Update")
+    table.insert(UPDATE_FUNCS, "MI_DeathReminder_Update")
+    table.insert(UPDATE_FUNCS, "MI_DiveReminder_Update")
+    table.insert(UPDATE_FUNCS, "MI_CheatDeathReminder_Update")
+    table.insert(UPDATE_FUNCS, "MI_MulchReminder_Update")
+    table.insert(UPDATE_FUNCS, "MI_OverloadReminder_Update")
+
+    table.insert(ENABLE_KEYS, "combat_buffReminder_enabled")
+    table.insert(ENABLE_KEYS, "combat_petReminder_enabled")
+    table.insert(ENABLE_KEYS, "combat_petIdleReminder_enabled")
+    table.insert(ENABLE_KEYS, "combat_deathReminder_enabled")
+    table.insert(ENABLE_KEYS, "combat_diveReminder_enabled")
+    table.insert(ENABLE_KEYS, "combat_cheatDeathReminder_enabled")
+    table.insert(ENABLE_KEYS, "combat_mulchReminder_enabled")
+    table.insert(ENABLE_KEYS, "combat_overloadReminder_enabled")
+end
+
+if addon.FOREVER then
+    table.insert(UPDATE_FUNCS, "MI_CampfireReminder_Update")
+    table.insert(UPDATE_FUNCS, "MI_BuffReminder_Update")
+    table.insert(ENABLE_KEYS, "forever_campfireReminder_enabled")
+    table.insert(ENABLE_KEYS, "combat_sealReminder_enabled")
+end
 
 local function updateReminders()
-    addon.MI_BuffReminder_Update()
-    addon.MI_PetReminder_Update()
-    addon.MI_DeathReminder_Update()
-    addon.MI_RepairReminder_Update()
-    addon.MI_DiveReminder_Update()
-    addon.MI_CheatDeathReminder_Update()
-    addon.MI_MulchReminder_Update()
-    addon.MI_OverloadReminder_Update()
+    for _, name in ipairs(UPDATE_FUNCS) do
+        local update = addon[name]
+        if update then update() end
+    end
 end
 
 -- Throttled wrapper -coalesces rapid event fires (e.g. UNIT_AURA spam in raids)
@@ -59,6 +95,10 @@ local function RegisterReminderEvents()
     eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP",  "player")
     eventFrame:RegisterEvent("PET_BAR_UPDATE")
     eventFrame:RegisterEvent("SPELLS_CHANGED")
+    -- Seal Reminder reads Judgement's usable state in combat, where buffs are hidden.
+    if addon.FOREVER then
+        eventFrame:RegisterEvent("SPELL_UPDATE_USABLE")
+    end
     eventFrame:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
     eventFrame:SetScript("OnEvent", function()
         updateRemindersThrottled()
@@ -78,15 +118,10 @@ end
 
 local function AnyReminderEnabled()
     local db = addon.db
-    return db.combat_buffReminder_enabled
-        or db.combat_petReminder_enabled
-        or db.combat_petIdleReminder_enabled
-        or db.combat_deathReminder_enabled
-        or db.combat_repairReminder_enabled
-        or db.combat_diveReminder_enabled
-        or db.combat_cheatDeathReminder_enabled
-        or db.combat_mulchReminder_enabled
-        or db.combat_overloadReminder_enabled
+    for _, key in ipairs(ENABLE_KEYS) do
+        if db[key] then return true end
+    end
+    return false
 end
 
 function addon.MI_Reminders_Init()

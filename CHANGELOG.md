@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.4.5
+- Added MystGems, a match-3 gem game with Power Gems, Prisms and its own music. Type /mqol gems to play, or let it open on flight paths with a bar showing time left on routes you've flown before. On by default, under Fun.
+- Added Max Plainsrunning Sound for Forever: plays music when Plainsrunning (Tauren) reaches 30 stacks and fades it out if you drop below 25. Off by default, under Fun.
+- Smaller download: removed an unused font and shrank the Bloodlust sound.
+
+## 1.4.4
+- Fixed a "blocked from an action only available to the Blizzard UI" error when using items from your bags (such as eating) after playing for a while with Bag Upgrade Indicators on.
+
+## 1.4.3
+- Fixed a "blocked from an action only available to the Blizzard UI" error when opening the bank with Bag Upgrade Indicators on.
+- Auto-Select Gossip no longer picks bank, vendor and other service options, leaving them to the game.
+
+## 1.4.2
+- Added Upgrade Spell Ranks on Bars for Forever: learning a new rank replaces lower ranks of that spell on your action bars.
+- Bag Space Warning shows for 2 seconds instead of 4, and can ignore the reagent bag.
+
+## 1.4.1
+- Added WoW: Forever support with its own settings for that client.
+- Added Forever-only Bag Space Warning, Campfire Reminder, and paladin Seal Reminder.
+
 ## 1.4.0
 - Added Ready Check Preflight for durability, weapon buffs, food, flask, Healthstones, and group Soulstone coverage when a Warlock is present.
 - Added an in-game Changelog button in the settings sidebar.

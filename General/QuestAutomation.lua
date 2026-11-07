@@ -11,6 +11,17 @@ f:RegisterEvent("QUEST_COMPLETE")
 f:RegisterEvent("QUEST_GREETING")
 f:RegisterEvent("GOSSIP_SHOW")
 
+-- Options that open a Blizzard window (bank, vendor, trainer and so on) are left
+-- to the game. It already picks these itself when they are the only option, and
+-- picking them from addon code opens the window tainted, which then gets
+-- protected actions blocked ("blocked from an action only available to the
+-- Blizzard UI"), e.g. when opening the bank.
+local BANKER_ICON = 132050 -- Interface\GossipFrame\BankerGossipIcon
+
+local function isServiceOption(option)
+    return option.selectOptionWhenOnlyOption or option.icon == BANKER_ICON
+end
+
 f:SetScript("OnEvent", function(_, event)
     if IsAltKeyDown() then return end
 
@@ -70,7 +81,7 @@ f:SetScript("OnEvent", function(_, event)
         -- Auto gossip select (first option)
         if addon.db.general_autoGossipSelect and event == "GOSSIP_SHOW" then
             local options = C_GossipInfo.GetOptions()
-            if options and #options == 1 then
+            if options and #options == 1 and not isServiceOption(options[1]) then
                 C_GossipInfo.SelectOption(options[1].gossipOptionID)
             end
         end

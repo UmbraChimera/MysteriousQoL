@@ -3,6 +3,21 @@ local _, addon = ...
 -- WoW add-ons cannot read packaged Markdown files at runtime. Keep this compact
 -- in-game summary aligned with CHANGELOG.md instead of duplicating every detail.
 local RELEASE_NOTES = [[
+|cff20d5e8Version 1.4.5|r
+Added MystGems, a match-3 gem game (/mqol gems) that can open on flight paths, and Max Plainsrunning Sound for Forever.
+
+|cff20d5e8Version 1.4.4|r
+Fixed the blocked action error when eating or using bag items with Bag Upgrade Indicators on.
+
+|cff20d5e8Version 1.4.3|r
+Fixed the blocked action error when opening the bank, and Auto-Select Gossip now leaves bank and vendor options to the game.
+
+|cff20d5e8Version 1.4.2|r
+Forever: Upgrade Spell Ranks on Bars, and a shorter Bag Space Warning that can ignore the reagent bag.
+
+|cff20d5e8Version 1.4.1|r
+WoW: Forever support, plus Forever-only Bag Space Warning, Campfire Reminder, and paladin Seal Reminder.
+
 |cff20d5e8Version 1.4.0|r
 Ready Check Preflight: personal gear and consumable checks, plus Healthstone and group Soulstone coverage when a Warlock is present.
 

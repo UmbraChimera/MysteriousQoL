@@ -94,11 +94,27 @@ local function isUpgrade(bag, slot)
     return level > baseline
 end
 
+-- Only the backpack and equipped bags. Forever reuses these container frames for
+-- bank bags. Calling Blizzard's Lua bag methods from addon code taints the bank
+-- panel's state (bankType), and from then on clicking any bag item - eating,
+-- equipping - is "blocked from an action only available to the Blizzard UI"
+-- until a reload. So this only uses built-in frame methods (GetID, IsShown) and
+-- plain field reads, never the container/button mixin methods.
+local function isPlayerBagID(id)
+    return id and id >= 0 and id <= (NUM_TOTAL_EQUIPPED_BAG_SLOTS or 5)
+end
+
+local function isPlayerBag(container)
+    return isPlayerBagID(container:GetID())
+end
+
 local function updateBag(container)
     if not addon.db or not addon.db.ui_bagUpgrade_enabled or not container:IsShown() then return end
-    for _, button in container:EnumerateValidItems() do
-        local bag, slot = button:GetBagID(), button:GetID()
-        local show = bag >= 0 and bag <= (NUM_TOTAL_EQUIPPED_BAG_SLOTS or 5) and isUpgrade(bag, slot)
+    if not isPlayerBag(container) or type(container.Items) ~= "table" then return end
+    for _, button in ipairs(container.Items) do
+        -- The combined bag holds buttons from every bag, so prefer the button's own bag.
+        local bag = button.bagID or container:GetID()
+        local show = button:IsShown() and isPlayerBagID(bag) and isUpgrade(bag, button:GetID())
         local arrow = arrows[button]
         if show and not arrow then
             arrow = button:CreateTexture(nil, "OVERLAY", nil, 7)
@@ -109,6 +125,13 @@ local function updateBag(container)
         end
         if arrow then arrow:SetShown(show) end
     end
+end
+
+-- Missing-enchant highlighting is retail only for now. Forever's enchantable slots
+-- differ (back, wrist and hands are enchantable, rings are not) and only matter at
+-- the level 60 cap, so the slot list needs redoing before this is turned back on.
+local function enchantsEnabled()
+    return addon.RETAIL and addon.db and addon.db.ui_missingEnchant_enabled
 end
 
 local function missingEnchant(slot)
@@ -127,7 +150,7 @@ local function updatePaperDoll()
     for slot, name in pairs(enchantSlots) do
         local button = _G["Character" .. name]
         if button then
-            local show = addon.db and addon.db.ui_missingEnchant_enabled and missingEnchant(slot)
+            local show = enchantsEnabled() and missingEnchant(slot)
             local overlay = overlays[button]
             if show and not overlay then
                 overlay = button:CreateTexture(nil, "OVERLAY", nil, 7)
@@ -146,20 +169,26 @@ local function refresh()
     if not addon.db then return end
     -- Clear first so reused/removed bag buttons cannot retain old upgrade hints.
     for _, arrow in pairs(arrows) do arrow:Hide() end
-    if addon.db.ui_bagUpgrade_enabled and ContainerFrameUtil_EnumerateContainerFrames then
-        for _, container in ContainerFrameUtil_EnumerateContainerFrames() do
-            if container.EnumerateValidItems then
+    if addon.db.ui_bagUpgrade_enabled then
+        local containers = { ContainerFrameCombinedBags }
+        for i = 1, (NUM_CONTAINER_FRAMES or 13) do
+            containers[#containers + 1] = _G["ContainerFrame" .. i]
+        end
+        for _, container in ipairs(containers) do
+            if container.UpdateItems and isPlayerBag(container) then
                 if not hookedContainers[container] then
                     hookedContainers[container] = true
                     container:HookScript("OnShow", function(self) updateBag(self) end)
                     hooksecurefunc(container, "UpdateItems", updateBag)
-                    hooksecurefunc(container, "UpdateSearchResults", updateBag)
+                    if container.UpdateSearchResults then
+                        hooksecurefunc(container, "UpdateSearchResults", updateBag)
+                    end
                 end
                 updateBag(container)
             end
         end
     end
-    if addon.db.ui_missingEnchant_enabled and not paperDollHooked and PaperDollItemSlotButton_Update then
+    if enchantsEnabled() and not paperDollHooked and PaperDollItemSlotButton_Update then
         paperDollHooked = true
         hooksecurefunc("PaperDollItemSlotButton_Update", updatePaperDoll)
     end
@@ -174,7 +203,7 @@ end
 
 function addon.MI_GearIndicators_RefreshState()
     frame:UnregisterAllEvents()
-    if addon.db.ui_bagUpgrade_enabled or addon.db.ui_missingEnchant_enabled then
+    if addon.db.ui_bagUpgrade_enabled or enchantsEnabled() then
         for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "ADDON_LOADED", "BAG_UPDATE_DELAYED",
             "PLAYER_EQUIPMENT_CHANGED", "UNIT_INVENTORY_CHANGED", "ITEM_DATA_LOAD_RESULT",
             "PLAYER_LEVEL_UP", "PLAYER_SPECIALIZATION_CHANGED", "SPELLS_CHANGED" }) do

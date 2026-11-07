@@ -74,8 +74,13 @@ addon.defaults = {
     fun_zoomies_rush         = true,
     fun_vendorSound_enabled  = false,
     fun_victory_enabled      = false,
+    fun_mystGems_enabled     = true,
+    fun_mystGems_flight      = true,
+    fun_mystGems_best        = 0,
+    fun_mystGems_muted       = false,
     -- Combat
     combat_buffReminder_enabled      = false,
+    combat_sealReminder_enabled      = false,
     combat_petReminder_enabled       = false,
     combat_petIdleReminder_enabled   = false,
     combat_deathReminder_enabled     = false,
@@ -103,6 +108,14 @@ addon.defaults = {
     general_autoGossipSelect     = false,
     general_ahCurrentExpansion   = false,
     general_maxCameraDistance    = false,
+
+    -- Forever only
+    forever_bagSpace_enabled          = false,
+    forever_bagSpace_threshold        = 4,
+    forever_bagSpace_ignoreReagent    = false,
+    forever_campfireReminder_enabled  = false,
+    forever_rankUpgrade_enabled       = false,
+    forever_plainsrunning_enabled     = false,
 
     -- UI > Gear
     ui_bagUpgrade_enabled         = false,
@@ -150,6 +163,7 @@ addon.defaults = {
 }
 
 local NUMBER_RULES = {
+    forever_bagSpace_threshold        = { min = 1,  max = 20 },
     ui_mouseRing_size             = { min = 20,    max = 100 },
     ui_dragonriding_barWidth      = { min = 8,     max = 200 },
     ui_dragonriding_speedHeight   = { min = 4,     max = 100 },

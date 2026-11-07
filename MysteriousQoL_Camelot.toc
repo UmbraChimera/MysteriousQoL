@@ -1,0 +1,53 @@
+## Interface: 16001
+## Title: MysteriousQoL
+## Notes: Mysterious quality of life improvements
+## Version: 1.4.5
+## SavedVariables: MysteriousQoLDB
+## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
+
+# WoW: Forever. The _Camelot suffix is the client's internal flavor name, the same
+# way retail uses _Mainline -naming this file _Forever would not be picked up.
+#
+# Anything that matches on retail spell IDs is left out until those are redone
+# against Forever's spell data: Blink, Stealth, Zoomies, and every reminder except
+# Mail and Repair. Buff Reminder loads only for its seal option. Ready Check is out
+# too -its durability, weapon buff, Well Fed and Healthstone checks all assume
+# retail consumables. Skip Queue Confirm is out
+# because Classic has no group finder sign-up dialog to auto-click.
+
+# Core -must load first
+Core/Flavor.lua
+Core/Init.lua
+Core/SettingsUI.lua
+Core/MinimapButton.lua
+
+# Feature modules
+General/Vendor.lua
+General/FasterLoot.lua
+General/LootWarnings.lua
+General/EasyDestroy.lua
+General/QuestAutomation.lua
+Fun/OwenWilson.lua
+Fun/Batman.lua
+Fun/VendorSound.lua
+UI/MouseRing.lua
+UI/HideElements.lua
+UI/ChatCopy.lua
+UI/Changelog.lua
+UI/GearIndicators.lua
+Reminders/BuffReminder.lua
+Reminders/MailReminder.lua
+Reminders/RepairReminder.lua
+
+# Forever only
+Forever/BagSpaceWarning.lua
+Forever/CampfireReminder.lua
+Forever/SpellRankUpgrade.lua
+Forever/Plainsrunning.lua
+
+Reminders/Reminders.lua
+
+Games/MystGems.lua
+
+# Main entry point -must load last
+MysteriousQoL.lua
