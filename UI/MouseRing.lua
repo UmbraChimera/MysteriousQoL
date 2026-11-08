@@ -1,23 +1,20 @@
 local addonName, addon = ...
 
--- A configurable ring that follows the cursor.
--- Cast progress: a second ring sweeps along the outside to show cast/channel progress.
--- Textures are borrowed from EnhanceQoL (Mouse.tga / Dot.tga).
+-- Ring that follows the cursor, with an optional outer ring that fills while
+-- you cast. Mouse.tga and Dot.tga are from EnhanceQoL.
 
 local RING_TEX = "Interface\\AddOns\\MysteriousQoL\\Assets\\Mouse.tga"
 local DOT_TEX  = "Interface\\AddOns\\MysteriousQoL\\Assets\\Dot.tga"
 
 local ringFrame = nil
 
--- Cached "last applied" values to detect setting changes without full reapply each frame
+-- Last applied style, so it's only reapplied when a setting changes
 local lastSize       = nil
 local lastClassColor = nil
 local lastHideDot    = nil
 
--- Cached last cursor position so we can skip SetPoint when the cursor hasn't moved
 local lastCx, lastCy = nil, nil
 
--- Cast progress state
 local castStart        = 0
 local castEnd          = 0
 local castIsChannel    = false
@@ -59,8 +56,7 @@ local function createRingFrame()
     dot:SetPoint("CENTER", f, "CENTER", 0, 0)
     f.dot = dot
 
-    -- Cast progress: a CooldownFrameTemplate swipe ring parented to UIParent so it
-    -- can be sized larger than the main ring. Repositioned every frame alongside it.
+    -- Cast ring is a cooldown swipe on UIParent so it can be bigger than the ring.
     local castRing = CreateFrame("Cooldown", "MysteriousQoL_CastRing", UIParent, "CooldownFrameTemplate")
     castRing:SetFrameStrata("TOOLTIP")
     castRing:SetDrawSwipe(true)
@@ -85,7 +81,6 @@ local function applyRingStyle()
     local r, g, b = getRingColor()
     ringFrame.ring:SetVertexColor(r, g, b, 1)
 
-    -- Cast ring: sized slightly larger than the main ring and tinted with ring color
     if ringFrame.castRing then
         local castSize = size + math.max(16, math.floor(size * 0.32 + 0.5))
         ringFrame.castRing:SetSize(castSize, castSize)
@@ -93,6 +88,7 @@ local function applyRingStyle()
     end
 
     if ringFrame.dot then
+        ringFrame.dot:SetVertexColor(r, g, b, 1)
         if db.ui_mouseRing_hideDot then ringFrame.dot:Hide() else ringFrame.dot:Show() end
     end
 
@@ -115,17 +111,13 @@ local function pollCast()
     castActive = false
 end
 
--- Parented to UIParent so it is always available; only runs when shown.
-
 local runner = CreateFrame("Frame", nil, UIParent)
 runner:Hide()
 runner:SetScript("OnUpdate", function()
     local db = addon.db
 
-    -- Lazy creation
     if not ringFrame then ringFrame = createRingFrame() end
 
-    -- Visibility
     local show = isRingVisible()
     if not show then
         if ringFrame:IsShown() then
@@ -141,7 +133,6 @@ runner:SetScript("OnUpdate", function()
         lastCx, lastCy = nil, nil
     end
 
-    -- Follow cursor; skip SetPoint when the cursor hasn't moved
     local x, y = GetCursorPosition()
     local scale = UIParent:GetEffectiveScale()
     local cx = x / scale
@@ -154,7 +145,6 @@ runner:SetScript("OnUpdate", function()
         lastCx, lastCy = cx, cy
     end
 
-    -- Detect style changes
     local size    = tonumber(db.ui_mouseRing_size) or 70
     local cls     = db.ui_mouseRing_useClassColor
     local hideDot = db.ui_mouseRing_hideDot
@@ -162,16 +152,15 @@ runner:SetScript("OnUpdate", function()
         applyRingStyle()
     end
 
-    -- Cast progress ring (swipe)
+    -- castActive comes from the cast events further down
     if db.ui_mouseRing_castProgress then
-        pollCast()
         if castActive and castStart and castEnd then
             local nowMS = GetTime() * 1000
             local dur   = castEnd - castStart
             if dur > 0 and nowMS < castEnd then
                 if castRingSetStart ~= castStart then
                     castRingSetStart = castStart
-                    -- Casts fill 0→100% (SetReverse true); channels drain 100→0% (false)
+                    -- casts fill up, channels drain
                     ringFrame.castRing:SetReverse(not castIsChannel)
                     ringFrame.castRing:SetCooldown(castStart / 1000, dur / 1000)
                     ringFrame.castRing:Show()
@@ -213,18 +202,33 @@ local function refreshRunnerVisibility()
     end
 end
 
+local CAST_EVENTS = {
+    "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED",
+    "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_DELAYED",
+    "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_CHANNEL_UPDATE",
+    "UNIT_SPELLCAST_EMPOWER_START", "UNIT_SPELLCAST_EMPOWER_STOP", "UNIT_SPELLCAST_EMPOWER_UPDATE",
+}
+local castFrame = CreateFrame("Frame")
+castFrame:SetScript("OnEvent", pollCast)
+
 local function enableRing()
     if not ringFrame then ringFrame = createRingFrame() end
+    for _, event in ipairs(CAST_EVENTS) do
+        pcall(castFrame.RegisterUnitEvent, castFrame, event, "player")
+    end
+    pollCast()
     applyRingStyle()
     refreshRunnerVisibility()
 end
 
 local function disableRing()
+    castFrame:UnregisterAllEvents()
+    castActive = false
     runner:Hide()
     hideRingVisuals()
 end
 
--- Refresh ring visibility when combat state changes (for "only in combat" mode)
+-- For "only in combat"
 local evtFrame = CreateFrame("Frame")
 evtFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 evtFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -232,7 +236,6 @@ evtFrame:SetScript("OnEvent", function()
     refreshRunnerVisibility()
 end)
 
--- Expose for custom settings UI
 function addon.MI_MouseRing_SetEnabled(v)
     if v then enableRing() else disableRing() end
 end
@@ -243,7 +246,6 @@ function addon.MI_MouseRing_RefreshVisibility()
     refreshRunnerVisibility()
 end
 
--- Called from MysteriousQoL.lua after InitDB.
 function addon.MI_MouseRing_Init()
     if addon.db.ui_mouseRing_enabled then
         enableRing()

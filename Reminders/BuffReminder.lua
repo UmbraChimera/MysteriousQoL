@@ -68,6 +68,10 @@ local SEAL_ICON_ID = 21084
 local sealNames = nil
 local sealPrefix = nil
 
+-- The seal you last had up, so the icon shows that one and its usable state
+-- can be checked. Only read while auras are readable.
+local lastSeal = nil -- { spellID, icon }
+
 -- Names can come back nil before spell data has loaded, so nothing is cached
 -- until at least one resolves.
 local function loadSealNames()
@@ -127,11 +131,31 @@ local function hasSeal()
         else
             local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
             if not aura then break end
-            if isSealName(aura.name) then return true end
+            if isSealName(aura.name) then
+                lastSeal = { spellID = aura.spellId, icon = aura.icon }
+                return true
+            end
         end
     end
     if unknown then return judgementSaysSeal() end
     return false
+end
+
+-- No point nagging while you cannot cast: stunned, feared, silenced and so on.
+-- A seal you cannot use for any reason other than mana counts as that.
+local function checkCanCastSeal()
+    if HasFullControl and not HasFullControl() then return false end
+    local id = lastSeal and lastSeal.spellID or SEAL_ICON_ID
+    if not IsPlayerSpell(id) then id = SEAL_ICON_ID end
+    local usable, noMana = C_Spell.IsSpellUsable(id)
+    return usable or noMana
+end
+
+-- If the client hides any of this in combat, assume you can cast.
+local function canCastSeal()
+    local ok, result = pcall(checkCanCastSeal)
+    if not ok then return true end
+    return result
 end
 
 -- Seals only last 30 seconds, so outside combat this would nag constantly.
@@ -147,7 +171,11 @@ local function getSealReminder()
     end
     -- Only nag when certain. A hidden aura could be the seal.
     if hasSeal() ~= false then return nil end
-    return { spellID = SEAL_ICON_ID }
+    if not canCastSeal() then return nil end
+    return {
+        spellID = SEAL_ICON_ID,
+        icon = lastSeal and lastSeal.icon,
+    }
 end
 
 local BUFF_ICON_SIZE = 52
@@ -179,7 +207,9 @@ function addon.MI_BuffReminder_Update()
     local entry = getBuffReminder() or getSealReminder()
     if entry then
         local spellInfo = C_Spell.GetSpellInfo(entry.spellID)
-        if spellInfo then
+        if entry.icon then
+            buffIcon:SetTexture(entry.icon)
+        elseif spellInfo then
             buffIcon:SetTexture(spellInfo.iconID)
         end
         buffPulse:Play()

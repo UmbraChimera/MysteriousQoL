@@ -300,12 +300,11 @@ local function RunUpdate()
 end
 
 local function OnUpdate(_, dt)
-    -- The tracker only accepts input while Alt is held, so it does not block
-    -- clicks intended for action bars or world frames underneath it.
-    UpdateMouseInteraction(false)
     elapsed = elapsed + dt
     if elapsed < THROTTLE then return end
     elapsed = 0
+    -- Only clickable while Alt is held so it doesn't eat clicks meant for the bars.
+    UpdateMouseInteraction(false)
     RunUpdate()
 end
 
@@ -332,10 +331,8 @@ local function OnEvent(_, event)
         secondaryStateDirty = true
         C_Timer.After(0.15, CheckMount)
     elseif isUpdating then
-        if event == "SPELL_UPDATE_CHARGES" or event == "SPELL_UPDATE_COOLDOWN" or event == "UNIT_AURA" then
-            secondaryStateDirty = true
-        end
-        RunUpdate()
+        -- The next OnUpdate tick picks this up.
+        secondaryStateDirty = true
     end
 end
 

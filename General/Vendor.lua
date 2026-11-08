@@ -21,7 +21,7 @@ vendorFrame:SetScript("OnEvent", function()
     -- Hold Shift to skip auto-repair and auto-sell.
     if IsShiftKeyDown() then return end
 
-    -- Small delay to ensure merchant data is fully loaded.
+    -- Merchant info isn't ready the moment it opens
     C_Timer.After(0.3, function()
         if not MerchantFrame:IsShown() then return end
 
@@ -29,12 +29,27 @@ vendorFrame:SetScript("OnEvent", function()
         if addon.db.vendor_autoRepair and CanMerchantRepair() then
             local cost = GetRepairAllCost()
             if cost and cost > 0 then
-                local useGuild = addon.db.vendor_autoRepair_guildBank and CanGuildBankRepair()
-                RepairAllItems(useGuild)
-                PlaySound(SOUNDKIT.ITEM_REPAIR)
-                local msg = "Repaired for " .. formatMoney(cost)
-                if useGuild then msg = msg .. " (guild bank)" end
-                print(PREFIX .. msg)
+                local useGuild = addon.db.vendor_autoRepair_guildBank and CanGuildBankRepair
+                    and CanGuildBankRepair()
+                -- The guild may not cover it: a withdraw limit below the cost, or
+                -- not enough in the bank. -1 means no limit.
+                if useGuild and GetGuildBankWithdrawMoney then
+                    local limit = GetGuildBankWithdrawMoney()
+                    if limit and limit >= 0 and limit < cost then useGuild = false end
+                end
+                if useGuild and GetGuildBankMoney then
+                    local bank = GetGuildBankMoney()
+                    if bank and bank > 0 and bank < cost then useGuild = false end
+                end
+                if not useGuild and GetMoney() < cost then
+                    print(PREFIX .. "Not enough gold to repair (" .. formatMoney(cost) .. ")")
+                else
+                    RepairAllItems(useGuild)
+                    PlaySound(SOUNDKIT.ITEM_REPAIR)
+                    local msg = "Repaired for " .. formatMoney(cost)
+                    if useGuild then msg = msg .. " (guild bank)" end
+                    print(PREFIX .. msg)
+                end
             end
         end
 

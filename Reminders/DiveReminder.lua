@@ -14,8 +14,6 @@ local function shouldShowDive()
     return C_UnitAuras.GetPlayerAuraBySpellID(DIVE_DEBUFF) ~= nil
 end
 
--- ── Display frame ──────────────────────────────────────────────────────────
-
 local diveFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_DiveReminderFrame", {
     baseY    = 60,
     bounce   = 10,
@@ -28,8 +26,6 @@ local diveFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_DiveReminderFra
     strata   = "HIGH",
     text     = "DIVE",
 })
-
--- ── Update ───────────────────────────────────────────────────────────────────
 
 function addon.MI_DiveReminder_Update()
     if shouldShowDive() then

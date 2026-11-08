@@ -93,10 +93,14 @@ local function refreshZoomState()
 end
 
 local auraFrame = CreateFrame("Frame")
-auraFrame:RegisterUnitEvent("UNIT_AURA", "player")
 auraFrame:SetScript("OnEvent", refreshZoomState)
 
--- Settings callback for both the master toggle and per-spell child toggles.
+-- Used by the main toggle and each spell's toggle.
 function addon.MI_Zoomies_SetEnabled()
+    if addon.db.fun_zoomies_enabled then
+        auraFrame:RegisterUnitEvent("UNIT_AURA", "player")
+    else
+        auraFrame:UnregisterAllEvents()
+    end
     refreshZoomState()
 end

@@ -1,14 +1,8 @@
 local _, addon = ...
 
--- Central event dispatcher for all reminder modules.
--- Each reminder exposes addon.MI_<Name>Reminder_Update() and is called on every refresh.
---
--- Modules are listed by name rather than called directly because each flavor's TOC
--- loads a different set -Forever has no skyriding, Midnight gathering, or Cheat Death.
--- Functions are resolved at call time so a module the TOC left out is simply skipped.
-
--- Repair is the only reminder that works on both flavors. Everything else keys off
--- retail spell IDs, so Forever loads none of it until those are redone.
+-- Runs every reminder's update function off one shared set of events.
+-- Listed by name because each TOC loads different reminders, and any that
+-- aren't loaded just get skipped. Repair is the only one on both versions.
 local UPDATE_FUNCS = {
     "MI_RepairReminder_Update",
 }
@@ -37,6 +31,12 @@ if addon.RETAIL then
 end
 
 if addon.FOREVER then
+    table.insert(UPDATE_FUNCS, "MI_ClassBuffs_Update")
+    if addon.MI_ClassBuffs_AllKeys then
+        for _, key in ipairs(addon.MI_ClassBuffs_AllKeys()) do
+            table.insert(ENABLE_KEYS, key)
+        end
+    end
     table.insert(UPDATE_FUNCS, "MI_CampfireReminder_Update")
     table.insert(UPDATE_FUNCS, "MI_BuffReminder_Update")
     table.insert(ENABLE_KEYS, "forever_campfireReminder_enabled")
@@ -50,7 +50,7 @@ local function updateReminders()
     end
 end
 
--- Throttled wrapper -coalesces rapid event fires (e.g. UNIT_AURA spam in raids)
+-- At most twice a second, UNIT_AURA spams in raids
 local THROTTLE_INTERVAL = 0.5
 local lastUpdate = 0
 local pendingTimer = nil
@@ -98,12 +98,18 @@ local function RegisterReminderEvents()
     -- Seal Reminder reads Judgement's usable state in combat, where buffs are hidden.
     if addon.FOREVER then
         eventFrame:RegisterEvent("SPELL_UPDATE_USABLE")
+        -- Class buffs: Thorns in bear form only, Righteous Fury with a shield only.
+        eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
+        eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+        -- Poisons and weapon imbues are not auras.
+        eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+        pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
     end
     eventFrame:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
     eventFrame:SetScript("OnEvent", function()
         updateRemindersThrottled()
     end)
-    -- Fallback ticker for taxi and edge cases not covered by events
+    -- Catches taxis and anything the events miss
     ticker = C_Timer.NewTicker(5, updateReminders)
 end
 
@@ -133,14 +139,13 @@ function addon.MI_Reminders_Init()
     end
 end
 
--- Called by settings UI when any reminder toggle changes
+-- Any reminder toggle in settings
 function addon.MI_Reminders_RefreshState()
     if AnyReminderEnabled() then
         RegisterReminderEvents()
         updateReminders()
     else
-        -- Give every module one final pass so visible frames and transient state
-        -- are cleared before their event source and fallback ticker stop.
+        -- One last update so anything still showing gets hidden
         updateReminders()
         UnregisterReminderEvents()
     end

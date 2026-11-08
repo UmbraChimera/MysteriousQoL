@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: MysteriousQoL
 ## Notes: Mysterious quality of life improvements
-## Version: 1.4.5
+## Version: 1.5.1
 ## SavedVariables: MysteriousQoLDB
 ## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
 
@@ -27,6 +27,8 @@ General/FasterLoot.lua
 General/LootWarnings.lua
 General/EasyDestroy.lua
 General/QuestAutomation.lua
+General/QuestRewardCoin.lua
+General/BuffThanks.lua
 Fun/OwenWilson.lua
 Fun/Batman.lua
 Fun/VendorSound.lua
@@ -35,15 +37,20 @@ UI/HideElements.lua
 UI/ChatCopy.lua
 UI/Changelog.lua
 UI/GearIndicators.lua
+UI/QuestXP.lua
+UI/Welcome.lua
 Reminders/BuffReminder.lua
 Reminders/MailReminder.lua
 Reminders/RepairReminder.lua
 
 # Forever only
 Forever/BagSpaceWarning.lua
+Forever/BagsFullHelper.lua
 Forever/CampfireReminder.lua
 Forever/SpellRankUpgrade.lua
 Forever/Plainsrunning.lua
+Forever/ClassBuffs.lua
+Forever/ReagentReminder.lua
 
 Reminders/Reminders.lua
 

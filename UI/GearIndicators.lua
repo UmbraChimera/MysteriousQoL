@@ -35,9 +35,10 @@ local arrows, overlays, hookedContainers = {}, {}, {}
 local requestedItems = {}
 local queued, paperDollHooked = false, false
 
+-- requestedItems: true while loading, false once the load came back.
 local function itemReady(itemID)
     if C_Item.IsItemDataCachedByID(itemID) then return true end
-    if not requestedItems[itemID] then
+    if requestedItems[itemID] == nil then
         requestedItems[itemID] = true
         C_Item.RequestLoadItemDataByID(itemID)
     end
@@ -51,6 +52,30 @@ local function equippedLevel(slot)
     return C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slot))
 end
 
+-- Class and equipped gear, read once per bag instead of once per slot.
+local gear = { levels = {} }
+local bagLoc = ItemLocation:CreateEmpty()
+
+local function readGear()
+    local mainLink = GetInventoryItemLink("player", 16)
+    local offLink = GetInventoryItemLink("player", 17)
+    gear.armor = armorByClass[select(2, UnitClass("player"))]
+    gear.offLink = offLink
+    gear.mainType = mainLink and select(4, C_Item.GetItemInfoInstant(mainLink))
+    gear.offType = offLink and select(4, C_Item.GetItemInfoInstant(offLink))
+    wipe(gear.levels)
+end
+
+-- nil when the item isn't cached yet.
+local function gearLevel(slot)
+    local level = gear.levels[slot]
+    if level == nil then
+        level = equippedLevel(slot) or false
+        gear.levels[slot] = level
+    end
+    return level or nil
+end
+
 local function isUpgrade(bag, slot)
     local info = C_Container.GetContainerItemInfo(bag, slot)
     if not info or info.isFiltered or not info.itemID or not itemReady(info.itemID) then return false end
@@ -58,37 +83,33 @@ local function isUpgrade(bag, slot)
     local _, _, _, equipLoc, _, classID, subclassID = C_Item.GetItemInfoInstant(info.itemID)
     local slots = slotsByEquipLoc[equipLoc]
     if not slots then return false end
-    local _, playerClass = UnitClass("player")
     if classID == 4 and subclassID >= 1 and subclassID <= 4 and equipLoc ~= "INVTYPE_CLOAK"
-        and subclassID ~= armorByClass[playerClass] then return false end
-    local level = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromBagAndSlot(bag, slot))
+        and subclassID ~= gear.armor then return false end
+    bagLoc:SetBagAndSlot(bag, slot)
+    local level = C_Item.GetCurrentItemLevel(bagLoc)
     if not level or level <= 0 then return false end
-    local mainLink = GetInventoryItemLink("player", 16)
-    local offLink = GetInventoryItemLink("player", 17)
-    local mainType = mainLink and select(4, C_Item.GetItemInfoInstant(mainLink))
-    local offType = offLink and select(4, C_Item.GetItemInfoInstant(offLink))
     local baseline
     for _, equippedSlot in ipairs(slots) do
-        local current = equippedLevel(equippedSlot)
-        if current == nil then return false end -- Never treat uncached gear as empty.
+        local current = gearLevel(equippedSlot)
+        if current == nil then return false end -- don't treat uncached gear as empty
         baseline = baseline and math.min(baseline, current) or current
     end
-    if equipLoc == "INVTYPE_WEAPON" and offType == "INVTYPE_WEAPON" then
-        local offLevel = equippedLevel(17)
+    if equipLoc == "INVTYPE_WEAPON" and gear.offType == "INVTYPE_WEAPON" then
+        local offLevel = gearLevel(17)
         if offLevel == nil then return false end
         baseline = math.min(baseline, offLevel)
-    elseif equipLoc == "INVTYPE_2HWEAPON" and offLink then
-        local offLevel = equippedLevel(17)
+    elseif equipLoc == "INVTYPE_2HWEAPON" and gear.offLink then
+        local offLevel = gearLevel(17)
         if offLevel == nil then return false end
-        -- Dual two-handers can replace either weapon. Otherwise a two-hander
-        -- displaces both hands: require a higher level than both equipped items.
-        if mainType == "INVTYPE_2HWEAPON" and offType == "INVTYPE_2HWEAPON" then
+        -- With two two-handers it can replace either one. Otherwise it
+        -- replaces both hands, so it has to beat both.
+        if gear.mainType == "INVTYPE_2HWEAPON" and gear.offType == "INVTYPE_2HWEAPON" then
             baseline = math.min(baseline, offLevel)
         else
             baseline = math.max(baseline, offLevel)
         end
-    elseif slots[1] == 17 and not offLink and mainType == "INVTYPE_2HWEAPON" then
-        baseline = equippedLevel(16)
+    elseif slots[1] == 17 and not gear.offLink and gear.mainType == "INVTYPE_2HWEAPON" then
+        baseline = gearLevel(16)
         if baseline == nil then return false end
     end
     return level > baseline
@@ -111,6 +132,7 @@ end
 local function updateBag(container)
     if not addon.db or not addon.db.ui_bagUpgrade_enabled or not container:IsShown() then return end
     if not isPlayerBag(container) or type(container.Items) ~= "table" then return end
+    readGear()
     for _, button in ipairs(container.Items) do
         -- The combined bag holds buttons from every bag, so prefer the button's own bag.
         local bag = button.bagID or container:GetID()
@@ -204,7 +226,8 @@ end
 function addon.MI_GearIndicators_RefreshState()
     frame:UnregisterAllEvents()
     if addon.db.ui_bagUpgrade_enabled or enchantsEnabled() then
-        for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "ADDON_LOADED", "BAG_UPDATE_DELAYED",
+        -- No BAG_UPDATE_DELAYED: open bags call UpdateItems on their own, and that's hooked.
+        for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "ADDON_LOADED",
             "PLAYER_EQUIPMENT_CHANGED", "UNIT_INVENTORY_CHANGED", "ITEM_DATA_LOAD_RESULT",
             "PLAYER_LEVEL_UP", "PLAYER_SPECIALIZATION_CHANGED", "SPELLS_CHANGED" }) do
             frame:RegisterEvent(event)
@@ -213,7 +236,12 @@ function addon.MI_GearIndicators_RefreshState()
     refresh()
 end
 
-frame:SetScript("OnEvent", function(_, event, unit)
-    if event == "UNIT_INVENTORY_CHANGED" and unit ~= "player" then return end
+frame:SetScript("OnEvent", function(_, event, arg1)
+    if event == "UNIT_INVENTORY_CHANGED" and arg1 ~= "player" then return end
+    -- Only items we asked for, not every tooltip or chat link.
+    if event == "ITEM_DATA_LOAD_RESULT" then
+        if not requestedItems[arg1] then return end
+        requestedItems[arg1] = false
+    end
     queueRefresh()
 end)

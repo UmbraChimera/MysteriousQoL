@@ -1,1045 +1,988 @@
 local addonName, addon = ...
 
--- EllesmereUI-inspired settings panel: left sidebar nav, header banner,
--- toggle-switch widgets, smooth scrolling. Locked to #027c90 (RGB 2/124/144).
-
-local C = {
-    -- Primary (#027c90) and variants
-    primary       = { 0.008, 0.486, 0.565, 1.0 },   -- #027c90
-    primaryBright = { 0.012, 0.647, 0.741, 1.0 },   -- hover / active accent
-    primaryDim    = { 0.005, 0.290, 0.337, 1.0 },   -- inactive borders
-    primaryBorder = { 0.008, 0.486, 0.565, 0.6 },   -- frame edge
-    primaryGlow   = { 0.008, 0.486, 0.565, 0.22 },  -- sidebar entry tint
-
-    -- Surfaces
-    bgMain        = { 0.05, 0.05, 0.06, 0.97 },
-    bgSidebar     = { 0.03, 0.03, 0.04, 1.00 },
-    bgHeader      = { 0.04, 0.04, 0.05, 1.00 },
-    bgHover       = { 1.00, 1.00, 1.00, 0.04 },
-
-    -- Text
-    text          = { 1.00, 1.00, 1.00, 1.0 },
-    textGray      = { 0.66, 0.66, 0.66, 1.0 },
-    textDim       = { 0.40, 0.40, 0.40, 1.0 },
-
-    -- Misc
-    black         = { 0.00, 0.00, 0.00, 1.0 },
-    checkBg       = { 0.15, 0.15, 0.15, 1.0 },
-    sliderTrack   = { 0.12, 0.12, 0.12, 1.0 },
-    sliderFill    = { 0.008, 0.486, 0.565, 1.0 },
-    toggleOff     = { 0.18, 0.18, 0.20, 1.0 },
-}
-
-local BAR_TEX = [[Interface\Buttons\WHITE8x8]]
-local FONT    = "Fonts\\FRIZQT__.TTF"
-
--- Layout constants
-local FRAME_WIDTH     = 900
-local FRAME_HEIGHT    = 600
-local SIDEBAR_WIDTH   = 220
-local HEADER_HEIGHT   = 80
-local SCROLLBAR_WIDTH = 8
-local CONTENT_PAD_L   = 22
-local CONTENT_PAD_R   = 22
-local CONTENT_PAD_T   = 14
-local WIDGET_HEIGHT   = 30
-local INDENT          = 24
-local SECTION_GAP     = 14
-local PANEL_SCALE_MIN = 0.6
-local PANEL_SCALE_MAX = 2.0
-local PANEL_EDGE_PAD  = 24
-
--- Toggle-switch geometry (used by Checkbox widget)
-local TOGGLE_W, TOGGLE_H = 38, 20
-local KNOB_SIZE   = 14
-local KNOB_OFF_X  = 3
-local KNOB_ON_X   = TOGGLE_W - KNOB_SIZE - 3  -- = 21
-local KNOB_SPEED  = 16  -- lerp coefficient
-local SCROLL_SPEED = 12 -- lerp coefficient for smooth scroll
-
-local CATEGORY_DESCRIPTIONS = {
-    ["General"]    = "Automation, camera, loot, and vendor.",
-    ["UI"]         = "Interface customization and frame visibility.",
-    ["Reminders"]  = "Don't miss the things that matter.",
-    ["Fun"]        = "Sounds and silly things.",
-}
-
-local mainFrame, contentFrame, scrollFrame, scrollChild
-local headerTitle, headerDesc
-local sidebarBody  -- holds the entry buttons
-local activeTab = nil
-local tabButtons = {}
-local categoryBuilders = {}
-local allWidgets = {}
-local tabCache = {}
+-- Settings panel: rounded panels, accent colour (teal, red or gold), pill
+-- switches, an icon sidebar, section cards and search.
+--
+-- Feature files register a category with a build function that calls Header,
+-- Checkbox, Dropdown, Slider and Button (see MysteriousQoL.lua). Those calls
+-- only note down what to show; the panel draws the notes when a category is
+-- first opened.
 
 addon.customUI = {}
+local UI = addon.customUI
 
--- Pre-allocated backdrop table reused by every MakeBackdrop call to avoid per-call allocations
-local backdrop1 = { bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1, insets = { left = 1, right = 1, top = 1, bottom = 1 } }
+local categoryBuilders = {}
+local recording = nil
 
-local function MakeBackdrop(frame, bgColor, borderColor, edgeSize)
-    edgeSize = edgeSize or 1
-    if edgeSize == 1 then
-        frame:SetBackdrop(backdrop1)
-    else
-        frame:SetBackdrop({
-            bgFile   = BAR_TEX,
-            edgeFile = BAR_TEX,
-            edgeSize = edgeSize,
-            insets   = { left = edgeSize, right = edgeSize, top = edgeSize, bottom = edgeSize },
-        })
-    end
-    frame:SetBackdropColor(unpack(bgColor))
-    if borderColor then
-        frame:SetBackdropBorderColor(unpack(borderColor))
-    end
-end
-
-local function GetMaxPanelScale()
-    local parentWidth = UIParent and UIParent:GetWidth() or 0
-    local parentHeight = UIParent and UIParent:GetHeight() or 0
-    if parentWidth <= 0 or parentHeight <= 0 then
-        return PANEL_SCALE_MAX
-    end
-
-    local fitWidth = math.max(1, parentWidth - PANEL_EDGE_PAD * 2) / FRAME_WIDTH
-    local fitHeight = math.max(1, parentHeight - PANEL_EDGE_PAD * 2) / FRAME_HEIGHT
-    return math.max(0.1, math.min(PANEL_SCALE_MAX, fitWidth, fitHeight))
-end
-
-local function ClampPanelScale(value)
-    local maxScale = GetMaxPanelScale()
-    local minScale = math.min(PANEL_SCALE_MIN, maxScale)
-    return math.max(minScale, math.min(maxScale, tonumber(value) or 1.0))
-end
-
-local function ApplyPanelScale(value, persist)
-    local scale = ClampPanelScale(value)
-    if mainFrame then mainFrame:SetScale(scale) end
-    if persist and addon.db then addon.db.settings_panel_scale = scale end
-    return scale
-end
-
-local function RecalcLayout()
-    if not scrollChild then return end
-    local y = -CONTENT_PAD_T
-    for _, entry in ipairs(allWidgets) do
-        if entry.frame then
-            if entry.visible == false then
-                entry.frame:Hide()
-            else
-                entry.frame:SetHeight(entry.height or WIDGET_HEIGHT)
-                entry.frame:ClearAllPoints()
-                entry.frame:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", entry.indent or 0, y)
-                entry.frame:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
-                entry.frame:Show()
-                y = y - (entry.height or WIDGET_HEIGHT) - 8
-            end
-        elseif entry.spacer then
-            y = y - entry.spacer
-        end
-    end
-    scrollChild:SetHeight(math.abs(y) + 20)
-    if addon._updateScrollbar then addon._updateScrollbar() end
-end
-
-local function UpdateChildVisibility(parentKey, checked)
-    for _, entry in ipairs(allWidgets) do
-        if entry.parentKey == parentKey then
-            entry.visible = checked
-        end
-    end
-    RecalcLayout()
-end
-
--- Widget: Section Header
-
-function addon.customUI.Header(title)
-    if #allWidgets > 0 then
-        table.insert(allWidgets, { spacer = SECTION_GAP })
-    end
-
-    local frame = CreateFrame("Frame", nil, scrollChild)
-    frame:SetHeight(26)
-
-    local text = frame:CreateFontString(nil, "OVERLAY")
-    text:SetFont(FONT, 14, "OUTLINE")
-    text:SetPoint("BOTTOMLEFT", 0, 5)
-    text:SetTextColor(unpack(C.primaryBright))
-    text:SetText(title)
-
-    local line = frame:CreateTexture(nil, "ARTWORK")
-    line:SetHeight(1)
-    line:SetPoint("BOTTOMLEFT", 0, 0)
-    line:SetPoint("BOTTOMRIGHT", 0, 0)
-    line:SetColorTexture(unpack(C.primaryDim))
-
-    table.insert(allWidgets, { frame = frame, height = 26 })
-end
-
--- Widget: Button
-
-function addon.customUI.Button(label, onClick)
-    local frame = CreateFrame("Frame", nil, scrollChild)
-    frame:SetHeight(WIDGET_HEIGHT)
-
-    local btn = CreateFrame("Button", nil, frame, "BackdropTemplate")
-    btn:SetSize(160, 24)
-    btn:SetPoint("LEFT", 0, 0)
-    MakeBackdrop(btn, { 0.10, 0.10, 0.10, 0.9 }, C.primaryBorder)
-    btn:SetScript("OnEnter", function(self)
-        self:SetBackdropBorderColor(unpack(C.primaryBright))
-    end)
-    btn:SetScript("OnLeave", function(self)
-        self:SetBackdropBorderColor(unpack(C.primaryBorder))
-    end)
-    btn:SetScript("OnClick", onClick)
-
-    local lbl = btn:CreateFontString(nil, "OVERLAY")
-    lbl:SetFont(FONT, 11, "")
-    lbl:SetAllPoints()
-    lbl:SetJustifyH("CENTER")
-    lbl:SetTextColor(unpack(C.primaryBright))
-    lbl:SetText(label)
-
-    table.insert(allWidgets, { frame = frame, height = WIDGET_HEIGHT })
-end
-
--- Widget: Checkbox (rendered as a toggle switch on the right)
-
-function addon.customUI.Checkbox(key, label, tooltip, onChange, children)
-    local widgetList = allWidgets
-    local frame = CreateFrame("Frame", nil, scrollChild)
-    frame:SetHeight(WIDGET_HEIGHT)
-
-    -- Toggle track (right side)
-    local track = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    track:SetSize(TOGGLE_W, TOGGLE_H)
-    track:SetPoint("RIGHT", 0, 0)
-    MakeBackdrop(track, C.toggleOff, C.primaryDim)
-
-    local knob = track:CreateTexture(nil, "OVERLAY")
-    knob:SetSize(KNOB_SIZE, KNOB_SIZE)
-    knob:SetColorTexture(unpack(C.text))
-    knob.curX = KNOB_OFF_X
-    knob:SetPoint("LEFT", knob.curX, 0)
-
-    local function PlaceKnob(x)
-        knob:ClearAllPoints()
-        knob:SetPoint("LEFT", x, 0)
-        knob.curX = x
-    end
-
-    local function StartKnobAnim(targetX)
-        knob.targetX = targetX
-        if math.abs(knob.curX - targetX) < 0.5 then
-            PlaceKnob(targetX)
-            return
-        end
-        track:SetScript("OnUpdate", function(self, elapsed)
-            local diff = knob.targetX - knob.curX
-            if math.abs(diff) < 0.5 then
-                PlaceKnob(knob.targetX)
-                self:SetScript("OnUpdate", nil)
-                return
-            end
-            PlaceKnob(knob.curX + diff * KNOB_SPEED * elapsed)
-        end)
-    end
-
-    -- Label (left, anchored to track's left edge)
-    local text = frame:CreateFontString(nil, "OVERLAY")
-    text:SetFont(FONT, 12, "")
-    text:SetPoint("TOPLEFT", 0, -2)
-    text:SetPoint("RIGHT", track, "LEFT", -12, 0)
-    text:SetJustifyH("LEFT")
-    text:SetTextColor(unpack(C.text))
-    text:SetText(label)
-
-    local desc
-    local entry
-    local descriptionLayoutQueued = false
-    local lastMeasuredWidth
-
-    local function UpdateDescriptionHeight()
-        descriptionLayoutQueued = false
-        if not desc or not entry or not frame:IsShown() then return end
-
-        local width = frame:GetWidth()
-        if width <= 0 then return end
-        lastMeasuredWidth = width
-
-        -- The FontString already has its wrapped width from its left/right
-        -- anchors.  GetStringHeight therefore reflects the actual rendered
-        -- lines rather than estimating them from the unwrapped string width.
-        local descHeight = desc:GetStringHeight() or 0
-        local height = math.max(WIDGET_HEIGHT, math.ceil(18 + descHeight))
-        if math.abs((entry.height or WIDGET_HEIGHT) - height) < 0.5 then return end
-
-        entry.height = height
-        frame:SetHeight(height)
-        if allWidgets == widgetList then
-            RecalcLayout()
-        end
-    end
-
-    local function QueueDescriptionLayout()
-        if descriptionLayoutQueued then return end
-        descriptionLayoutQueued = true
-        C_Timer.After(0, UpdateDescriptionHeight)
-    end
-
-    if tooltip then
-        desc = frame:CreateFontString(nil, "OVERLAY")
-        desc:SetFont(FONT, 10, "")
-        desc:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -2)
-        desc:SetPoint("RIGHT", track, "LEFT", -12, 0)
-        desc:SetJustifyH("LEFT")
-        desc:SetTextColor(unpack(C.textGray))
-        desc:SetText(tooltip)
-        desc:SetWordWrap(true)
-
-        frame:SetScript("OnShow", QueueDescriptionLayout)
-        frame:SetScript("OnSizeChanged", function(_, width)
-            if not lastMeasuredWidth or math.abs(width - lastMeasuredWidth) >= 0.5 then
-                QueueDescriptionLayout()
-            end
-        end)
-    end
-
-    local function Refresh(skipAnim)
-        local val = addon.db[key]
-        if val then
-            track:SetBackdropColor(unpack(C.primary))
-        else
-            track:SetBackdropColor(unpack(C.toggleOff))
-        end
-        local targetX = val and KNOB_ON_X or KNOB_OFF_X
-        if skipAnim then
-            PlaceKnob(targetX)
-            knob.targetX = targetX
-        else
-            StartKnobAnim(targetX)
-        end
-        if children then UpdateChildVisibility(key, val) end
-    end
-
-    local clickOverlay = CreateFrame("Button", nil, frame)
-    clickOverlay:SetAllPoints()
-    clickOverlay:SetScript("OnClick", function()
-        addon.db[key] = not addon.db[key]
-        Refresh()
-        if onChange then onChange(addon.db[key]) end
-    end)
-    clickOverlay:SetScript("OnEnter", function()
-        track:SetBackdropBorderColor(unpack(C.primaryBright))
-    end)
-    clickOverlay:SetScript("OnLeave", function()
-        track:SetBackdropBorderColor(unpack(C.primaryDim))
-    end)
-
-    entry = { frame = frame, height = WIDGET_HEIGHT, key = key, refresh = Refresh }
-    table.insert(widgetList, entry)
-    if desc then QueueDescriptionLayout() end
-
-    if children then
-        local function MarkChild()
-            local childEntry = allWidgets[#allWidgets]
-            childEntry.parentKey = key
-            childEntry.indent = INDENT
-            childEntry.visible = addon.db[key]
-        end
-        for _, child in ipairs(children) do
-            if child.type == "checkbox" then
-                addon.customUI.Checkbox(child.key, child.label, child.tooltip, child.onChange)
-                MarkChild()
-            elseif child.type == "dropdown" then
-                addon.customUI.Dropdown(child.key, child.label, child.options, child.tooltip, child.onChange)
-                MarkChild()
-            elseif child.type == "slider" then
-                addon.customUI.Slider(child.key, child.label, child.min, child.max, child.step, child.tooltip, child.onChange)
-                MarkChild()
-            elseif child.type == "button" then
-                addon.customUI.Button(child.label, child.onClick)
-                MarkChild()
-            elseif child.type == "header" then
-                addon.customUI.Header(child.label)
-                local n = #allWidgets
-                if n >= 2 and allWidgets[n-1].spacer then
-                    allWidgets[n-1].parentKey = key
-                    allWidgets[n-1].visible   = addon.db[key]
-                end
-                allWidgets[n].parentKey = key
-                allWidgets[n].visible   = addon.db[key]
-            end
-        end
-    end
-
-    Refresh(true)
-end
-
--- Widget: Dropdown
-
-function addon.customUI.Dropdown(key, label, options, tooltip, onChange)
-    local frame = CreateFrame("Frame", nil, scrollChild)
-    frame:SetHeight(WIDGET_HEIGHT)
-
-    local text = frame:CreateFontString(nil, "OVERLAY")
-    text:SetFont(FONT, 12, "")
-    text:SetPoint("LEFT", 0, 0)
-    text:SetTextColor(unpack(C.text))
-    text:SetText(label)
-
-    local btn = CreateFrame("Button", nil, frame, "BackdropTemplate")
-    btn:SetSize(180, 24)
-    btn:SetPoint("RIGHT", 0, 0)
-    MakeBackdrop(btn, C.checkBg, C.primaryDim)
-
-    local btnText = btn:CreateFontString(nil, "OVERLAY")
-    btnText:SetFont(FONT, 11, "")
-    btnText:SetPoint("LEFT", 8, 0)
-    btnText:SetPoint("RIGHT", -16, 0)
-    btnText:SetJustifyH("LEFT")
-    btnText:SetTextColor(unpack(C.text))
-
-    local arrow = btn:CreateFontString(nil, "OVERLAY")
-    arrow:SetFont(FONT, 11, "")
-    arrow:SetPoint("RIGHT", -6, 0)
-    arrow:SetTextColor(unpack(C.primaryBright))
-    arrow:SetText("v")
-
-    local menu = CreateFrame("Frame", nil, btn, "BackdropTemplate")
-    menu:SetFrameStrata("TOOLTIP")
-    menu:SetPoint("TOPLEFT", btn, "BOTTOMLEFT", 0, -2)
-    menu:SetPoint("TOPRIGHT", btn, "BOTTOMRIGHT", 0, -2)
-    MakeBackdrop(menu, C.bgMain, C.primaryDim)
-    menu:Hide()
-
-    local function CloseMenu() menu:Hide() end
-
-    local function Refresh()
-        local val = addon.db[key]
-        for _, opt in ipairs(options) do
-            if opt.value == val then
-                btnText:SetText(opt.text)
-                break
-            end
-        end
-    end
-
-    local menuHeight = 0
-    for i, opt in ipairs(options) do
-        local optBtn = CreateFrame("Button", nil, menu)
-        optBtn:SetHeight(20)
-        optBtn:SetPoint("TOPLEFT", 2, -(2 + (i - 1) * 20))
-        optBtn:SetPoint("TOPRIGHT", -2, -(2 + (i - 1) * 20))
-
-        local optBg = optBtn:CreateTexture(nil, "BACKGROUND")
-        optBg:SetAllPoints()
-        optBg:SetColorTexture(0, 0, 0, 0)
-
-        local optText = optBtn:CreateFontString(nil, "OVERLAY")
-        optText:SetFont(FONT, 11, "")
-        optText:SetPoint("LEFT", 6, 0)
-        optText:SetTextColor(unpack(C.text))
-        optText:SetText(opt.text)
-
-        optBtn:SetScript("OnEnter", function() optBg:SetColorTexture(unpack(C.primaryDim)) end)
-        optBtn:SetScript("OnLeave", function() optBg:SetColorTexture(0, 0, 0, 0) end)
-        optBtn:SetScript("OnClick", function()
-            addon.db[key] = opt.value
-            Refresh()
-            CloseMenu()
-            if onChange then onChange(opt.value) end
-        end)
-
-        menuHeight = menuHeight + 20
-    end
-    menu:SetHeight(menuHeight + 4)
-
-    btn:SetScript("OnClick", function()
-        if menu:IsShown() then CloseMenu() else menu:Show() end
-    end)
-
-    menu:SetScript("OnUpdate", function()
-        if menu:IsShown() and not menu:IsMouseOver() and not btn:IsMouseOver() then
-            if IsMouseButtonDown("LeftButton") then CloseMenu() end
-        end
-    end)
-
-    btn:SetScript("OnEnter", function() btn:SetBackdropBorderColor(unpack(C.primaryBright)) end)
-    btn:SetScript("OnLeave", function() btn:SetBackdropBorderColor(unpack(C.primaryDim)) end)
-
-    if tooltip then
-        local desc = frame:CreateFontString(nil, "OVERLAY")
-        desc:SetFont(FONT, 10, "")
-        desc:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -2)
-        desc:SetPoint("RIGHT", btn, "LEFT", -12, 0)
-        desc:SetJustifyH("LEFT")
-        desc:SetTextColor(unpack(C.textGray))
-        desc:SetText(tooltip)
-    end
-
-    table.insert(allWidgets, { frame = frame, height = WIDGET_HEIGHT, key = key, refresh = Refresh })
-    Refresh()
-end
-
--- Widget: Slider
-
-function addon.customUI.Slider(key, label, minVal, maxVal, step, _, onChange)
-    local frame = CreateFrame("Frame", nil, scrollChild)
-    frame:SetHeight(WIDGET_HEIGHT + 10)
-
-    local text = frame:CreateFontString(nil, "OVERLAY")
-    text:SetFont(FONT, 12, "")
-    text:SetPoint("TOPLEFT", 0, 0)
-    text:SetTextColor(unpack(C.text))
-    text:SetText(label)
-
-    local valText = frame:CreateFontString(nil, "OVERLAY")
-    valText:SetFont(FONT, 11, "")
-    valText:SetPoint("TOPRIGHT", 0, 0)
-    valText:SetTextColor(unpack(C.primaryBright))
-
-    local track = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    track:SetHeight(8)
-    track:SetPoint("TOPLEFT", 0, -22)
-    track:SetPoint("TOPRIGHT", 0, -22)
-    MakeBackdrop(track, C.sliderTrack, C.primaryDim)
-
-    local fill = track:CreateTexture(nil, "ARTWORK")
-    fill:SetPoint("TOPLEFT", 1, -1)
-    fill:SetHeight(6)
-    fill:SetColorTexture(unpack(C.sliderFill))
-
-    local thumb = CreateFrame("Frame", nil, track, "BackdropTemplate")
-    thumb:SetSize(12, 14)
-    thumb:SetFrameLevel(track:GetFrameLevel() + 2)
-    MakeBackdrop(thumb, C.primary, C.black)
-
-    local function Refresh()
-        local val = addon.db[key] or minVal
-        val = math.max(minVal, math.min(maxVal, val))
-        local pct = (val - minVal) / (maxVal - minVal)
-        local trackWidth = track:GetWidth() - 2
-        if trackWidth > 0 then
-            fill:SetWidth(math.max(1, pct * trackWidth))
-            thumb:ClearAllPoints()
-            thumb:SetPoint("CENTER", track, "LEFT", 1 + pct * trackWidth, 0)
-        end
-        if step >= 1 then
-            valText:SetText(tostring(math.floor(val)))
-        else
-            valText:SetText(string.format("%.1f", val))
-        end
-    end
-
-    local dragging = false
-    local function SetFromMouse()
-        local left = track:GetLeft()
-        local right = track:GetRight()
-        if not left or not right or right <= left then return end
-        local cx = GetCursorPosition() / track:GetEffectiveScale()
-        local pct = (cx - left) / (right - left)
-        pct = math.max(0, math.min(1, pct))
-        local raw = minVal + pct * (maxVal - minVal)
-        local snapped = math.floor(raw / step + 0.5) * step
-        snapped = math.max(minVal, math.min(maxVal, snapped))
-        addon.db[key] = snapped
-        Refresh()
-        if onChange then onChange(snapped) end
-    end
-
-    local dragOverlay = CreateFrame("Button", nil, track)
-    dragOverlay:SetAllPoints()
-    dragOverlay:SetScript("OnMouseDown", function() dragging = true; SetFromMouse() end)
-    dragOverlay:SetScript("OnMouseUp", function() dragging = false end)
-    dragOverlay:SetScript("OnUpdate", function() if dragging then SetFromMouse() end end)
-
-    dragOverlay:EnableMouseWheel(true)
-    dragOverlay:SetScript("OnMouseWheel", function(_, delta)
-        local val = (addon.db[key] or minVal) + delta * step
-        val = math.max(minVal, math.min(maxVal, val))
-        addon.db[key] = val
-        Refresh()
-        if onChange then onChange(val) end
-    end)
-
-    -- Defer initial refresh until track has width (one-shot OnUpdate)
-    frame:SetScript("OnShow", function(self)
-        self:SetScript("OnUpdate", function(self2)
-            if track:GetWidth() > 0 then
-                self2:SetScript("OnUpdate", nil)
-                Refresh()
-            end
-        end)
-    end)
-
-    table.insert(allWidgets, { frame = frame, height = WIDGET_HEIGHT + 10, key = key, refresh = Refresh })
-end
-
-function addon.customUI.RegisterCategory(name, buildFunc)
+function UI.RegisterCategory(name, buildFunc)
     categoryBuilders[name] = buildFunc
 end
 
-local function CreateSidebarEntry(parent, name, index)
-    local ENTRY_H = 38
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetHeight(ENTRY_H)
-    btn:SetPoint("TOPLEFT", 0, -(index - 1) * ENTRY_H)
-    btn:SetPoint("TOPRIGHT", 0, -(index - 1) * ENTRY_H)
+function UI.Header(label)
+    if not recording then return end
+    recording[#recording + 1] = { kind = "header", label = label }
+end
 
-    -- Glow background (gradient from primary at left → transparent at right)
-    local glow = btn:CreateTexture(nil, "BACKGROUND")
-    glow:SetTexture(BAR_TEX)
-    glow:SetAllPoints()
-    glow:SetGradient("HORIZONTAL",
-        CreateColor(C.primaryGlow[1], C.primaryGlow[2], C.primaryGlow[3], C.primaryGlow[4]),
-        CreateColor(0, 0, 0, 0))
-    glow:Hide()
+function UI.Checkbox(key, label, tooltip, onChange, children)
+    if not recording then return end
+    recording[#recording + 1] = { kind = "checkbox", key = key, label = label, tooltip = tooltip,
+                                  onChange = onChange, children = children }
+end
 
-    -- Hover backdrop
-    local hover = btn:CreateTexture(nil, "BACKGROUND")
-    hover:SetAllPoints()
-    hover:SetColorTexture(unpack(C.bgHover))
-    hover:Hide()
+function UI.Dropdown(key, label, options, tooltip, onChange)
+    if not recording then return end
+    recording[#recording + 1] = { kind = "dropdown", key = key, label = label, options = options,
+                                  tooltip = tooltip, onChange = onChange }
+end
 
-    -- Accent stripe on the left edge (visible when active)
-    local stripe = btn:CreateTexture(nil, "OVERLAY")
-    stripe:SetWidth(3)
-    stripe:SetPoint("TOPLEFT", 0, 0)
-    stripe:SetPoint("BOTTOMLEFT", 0, 0)
-    stripe:SetColorTexture(unpack(C.primaryBright))
-    stripe:Hide()
+function UI.Slider(key, label, min, max, step, tooltip, onChange)
+    if not recording then return end
+    recording[#recording + 1] = { kind = "slider", key = key, label = label, min = min, max = max,
+                                  step = step, tooltip = tooltip, onChange = onChange }
+end
 
-    local text = btn:CreateFontString(nil, "OVERLAY")
-    text:SetFont(FONT, 13, "")
-    text:SetPoint("LEFT", 18, 0)
-    text:SetTextColor(unpack(C.textGray))
-    text:SetText(name)
+function UI.Button(label, onClick)
+    if not recording then return end
+    recording[#recording + 1] = { kind = "button", label = label, onClick = onClick }
+end
 
-    btn:SetScript("OnEnter", function()
-        if activeTab ~= name then
-            hover:Show()
-            text:SetTextColor(0.85, 0.85, 0.85, 1)
+local MEDIA = "Interface\\AddOns\\" .. addonName .. "\\Assets\\UI\\"
+local FONT  = "Fonts\\FRIZQT__.TTF"
+local WHITE = "Interface\\Buttons\\WHITE8x8"
+
+local WIDTH, HEIGHT = 940, 620
+local SIDEBAR_W     = 214
+local BANNER_H      = 76
+local PAGE_HEAD_H   = 70
+local SCROLL_STEP   = 48
+
+local ACCENTS = {
+    teal = { accent = { 0.10, 0.72, 0.82 }, dim = { 0.008, 0.486, 0.565 }, deep = { 0.02, 0.16, 0.19 } },
+    red  = { accent = { 0.92, 0.36, 0.33 }, dim = { 0.64, 0.20, 0.18 }, deep = { 0.25, 0.07, 0.06 } },
+    gold = { accent = { 0.90, 0.74, 0.42 }, dim = { 0.62, 0.49, 0.27 }, deep = { 0.24, 0.18, 0.09 } },
+}
+
+-- Order the accent button cycles through. Teal is the default.
+local ACCENT_ORDER = { "teal", "red", "gold" }
+local ACCENT_LABELS = { teal = "Teal", red = "Red", gold = "Gold" }
+
+local C = {
+    bg       = { 0.055, 0.058, 0.07, 0.97 },
+    sidebar  = { 0.04, 0.042, 0.05, 1 },
+    card     = { 0.085, 0.09, 0.105, 1 },
+    cardEdge = { 0.17, 0.17, 0.19, 1 },
+    hover    = { 1, 1, 1, 0.04 },
+    text     = { 1, 1, 1, 1 },
+    dim      = { 0.62, 0.62, 0.64, 1 },
+    faint    = { 0.42, 0.42, 0.44, 1 },
+    trackOff = { 0.23, 0.23, 0.25, 1 },
+    knobOff  = { 0.55, 0.56, 0.58, 1 },
+    knobOn   = { 0.95, 0.92, 0.85, 1 },
+}
+
+local CATEGORIES = {
+    { name = "General",   icon = "Interface\\Icons\\Trade_Engineering",
+      desc = "Quests, automation, loot, bags and vendor." },
+    { name = "UI",        icon = "Interface\\Icons\\INV_Misc_Spyglass_03",
+      desc = "Interface customization and frame visibility." },
+    { name = "Reminders", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01",
+      desc = "Don't miss the things that matter." },
+    { name = "Fun",       icon = "Interface\\Icons\\INV_Misc_Ticket_Darkmoon_01",
+      desc = "Sounds and silly things." },
+    -- Opened from the small button above Changelog, not the sidebar list.
+    { name = "Settings",  icon = "Interface\\Icons\\INV_Misc_Gear_01",
+      desc = "Addon options.", footer = true },
+}
+
+local accentName = "teal"
+local A = ACCENTS.teal
+local painters = {}
+
+-- Runs fn now and again whenever the accent changes.
+local function onAccent(fn)
+    painters[#painters + 1] = fn
+    fn()
+end
+
+local function setAccent(name)
+    if not ACCENTS[name] then name = "teal" end
+    accentName = name
+    A = ACCENTS[name]
+    addon.db.settings_accent = name
+    for _, fn in ipairs(painters) do fn() end
+end
+
+local function nextAccent()
+    for i, name in ipairs(ACCENT_ORDER) do
+        if name == accentName then
+            return ACCENT_ORDER[i % #ACCENT_ORDER + 1]
         end
-    end)
-    btn:SetScript("OnLeave", function()
-        hover:Hide()
-        if activeTab ~= name then
-            text:SetTextColor(unpack(C.textGray))
-        end
-    end)
+    end
+    return ACCENT_ORDER[1]
+end
 
-    local function SetActive(active)
-        if active then
-            stripe:Show()
-            glow:Show()
-            hover:Hide()
-            text:SetTextColor(unpack(C.primaryBright))
-            text:SetFont(FONT, 13, "OUTLINE")
+-- Texture helpers
+
+local function sliced(tex, file, margin)
+    tex:SetTexture(MEDIA .. file)
+    if tex.SetTextureSliceMargins then
+        tex:SetTextureSliceMargins(margin, margin, margin, margin)
+        tex:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
+    end
+end
+
+local function rounded(frame, layer, color, file)
+    local tex = frame:CreateTexture(nil, layer or "BACKGROUND")
+    sliced(tex, file or "Rounded", 10)
+    tex:SetAllPoints()
+    if color then tex:SetVertexColor(unpack(color)) end
+    return tex
+end
+
+local function text(parent, size, color, flags)
+    local fs = parent:CreateFontString(nil, "OVERLAY")
+    fs:SetFont(FONT, size, flags or "")
+    fs:SetJustifyH("LEFT")
+    if color then fs:SetTextColor(unpack(color)) end
+    return fs
+end
+
+local function firstSentence(tip)
+    if not tip then return nil end
+    return tip:match("^(.-[%.!?])%s") or tip
+end
+
+-- Round icon in a ring.
+local function emblem(parent, size, icon)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(size, size)
+    local tex = f:CreateTexture(nil, "ARTWORK")
+    tex:SetPoint("TOPLEFT", 3, -3)
+    tex:SetPoint("BOTTOMRIGHT", -3, 3)
+    tex:SetTexture(icon)
+    tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local mask = f:CreateMaskTexture()
+    mask:SetTexture(MEDIA .. "CircleMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    mask:SetAllPoints(tex)
+    tex:AddMaskTexture(mask)
+    local ring = f:CreateTexture(nil, "OVERLAY")
+    ring:SetTexture(MEDIA .. "CircleRing")
+    ring:SetAllPoints()
+    onAccent(function() ring:SetVertexColor(unpack(A.accent)) end)
+    f.icon = tex
+    return f
+end
+
+-- Rounded button with an accent ring.
+local function button(parent, label, w, h)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(w, h)
+    local bg = rounded(b, "BACKGROUND", C.card)
+    local ring = rounded(b, "BORDER", nil, "Ring")
+    local hl = rounded(b, "HIGHLIGHT", C.hover)
+    hl:SetBlendMode("ADD")
+    b.label = text(b, 11)
+    b.label:SetPoint("CENTER")
+    b.label:SetJustifyH("CENTER")
+    b.label:SetText(label)
+    onAccent(function()
+        ring:SetVertexColor(unpack(A.dim))
+        b.label:SetTextColor(unpack(A.accent))
+    end)
+    b.bg = bg
+    return b
+end
+
+-- Pill switch
+local function switch(parent)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(34, 18)
+    local track = b:CreateTexture(nil, "ARTWORK")
+    track:SetAllPoints()
+    sliced(track, "Pill", 8)
+    local knob = b:CreateTexture(nil, "OVERLAY")
+    knob:SetSize(14, 14)
+    knob:SetTexture(MEDIA .. "Knob")
+    function b:Paint()
+        track:SetVertexColor(unpack(self.on and A.dim or C.trackOff))
+        knob:SetVertexColor(unpack(self.on and C.knobOn or C.knobOff))
+        knob:ClearAllPoints()
+        if self.on then knob:SetPoint("RIGHT", -2, 0) else knob:SetPoint("LEFT", 2, 0) end
+    end
+    function b:SetOn(on)
+        self.on = on and true or false
+        self:Paint()
+    end
+    onAccent(function() b:Paint() end)
+    return b
+end
+
+-- One shared drop-down menu.
+local menu
+local function openMenu(anchor, options, current, onPick)
+    if not menu then
+        menu = CreateFrame("Frame", nil, UIParent)
+        menu:SetFrameStrata("FULLSCREEN_DIALOG")
+        menu:EnableMouse(true)
+        rounded(menu, "BACKGROUND", { 0.07, 0.075, 0.09, 0.98 })
+        menu.ring = rounded(menu, "BORDER", nil, "Ring")
+        menu.items = {}
+        menu:SetScript("OnUpdate", function(self)
+            if IsMouseButtonDown("LeftButton") and not self:IsMouseOver()
+                and not (self.anchor and self.anchor:IsMouseOver()) then
+                self:Hide()
+            end
+        end)
+    end
+    menu.ring:SetVertexColor(unpack(A.dim))
+    menu.anchor = anchor
+    for _, item in ipairs(menu.items) do item:Hide() end
+    for i, opt in ipairs(options) do
+        local item = menu.items[i]
+        if not item then
+            item = CreateFrame("Button", nil, menu)
+            item:SetHeight(20)
+            local hl = item:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints()
+            hl:SetColorTexture(1, 1, 1, 0.06)
+            item.label = text(item, 11)
+            item.label:SetPoint("LEFT", 10, 0)
+            menu.items[i] = item
+        end
+        item:ClearAllPoints()
+        item:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 20)
+        item:SetPoint("TOPRIGHT", -4, -4 - (i - 1) * 20)
+        item.label:SetText(opt.text)
+        item.label:SetTextColor(unpack(opt.value == current and A.accent or C.text))
+        item:SetScript("OnClick", function()
+            menu:Hide()
+            onPick(opt.value)
+        end)
+        item:Show()
+    end
+    menu:SetSize(anchor:GetWidth(), #options * 20 + 8)
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -2)
+    menu:Show()
+end
+
+-- Recording a category's settings
+
+local function record(builder)
+    recording = {}
+    local ok, err = pcall(builder)
+    local defs = recording
+    recording = nil
+    if not ok then geterrorhandler()(err) end
+    return defs
+end
+
+-- Turns a child table from a Checkbox call into the same shape as a recorded def.
+local function childDef(child)
+    local kind = child.type == "header" and "header" or child.type
+    return {
+        kind = kind, key = child.key, label = child.label, tooltip = child.tooltip,
+        onChange = child.onChange, options = child.options, min = child.min,
+        max = child.max, step = child.step, onClick = child.onClick,
+        zeroText = child.zeroText,
+    }
+end
+
+-- Rows
+
+local function rowBase(card, def, indent)
+    local row = CreateFrame("Button", nil, card)
+    local desc = firstSentence(def.tooltip)
+    row:SetHeight(desc and 42 or 30)
+    local hl = rounded(row, "HIGHLIGHT", C.hover)
+    hl:SetBlendMode("ADD")
+
+    row.label = text(row, 13, C.text)
+    row.label:SetText(def.label or "")
+    if desc then
+        row.label:SetPoint("TOPLEFT", 54 + indent, -7)
+        row.desc = text(row, 11, C.dim)
+        row.desc:SetPoint("TOPLEFT", row.label, "BOTTOMLEFT", 0, -3)
+        row.desc:SetPoint("RIGHT", row, "RIGHT", -200, 0)
+        row.desc:SetWordWrap(false)
+        row.desc:SetText(desc)
+    else
+        row.label:SetPoint("LEFT", 54 + indent, 0)
+    end
+
+    row.searchText = ((def.label or "") .. " " .. (def.tooltip or "")):lower()
+    if def.tooltip then
+        row:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_NONE")
+            GameTooltip:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 54 + indent, 2)
+            GameTooltip:SetText(def.label or "", A.accent[1], A.accent[2], A.accent[3])
+            GameTooltip:AddLine(def.tooltip, 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", GameTooltip_Hide)
+    end
+    return row
+end
+
+local function checkboxRow(page, card, def, indent)
+    local row = rowBase(card, def, indent)
+    local sw = switch(row)
+    sw:SetPoint("LEFT", 10 + indent, 0)
+    local function toggle()
+        addon.db[def.key] = not addon.db[def.key]
+        sw:SetOn(addon.db[def.key])
+        if def.onChange then def.onChange(addon.db[def.key]) end
+        page:Layout()
+    end
+    row:SetScript("OnClick", toggle)
+    sw:SetScript("OnClick", toggle)
+    row.refresh = function() sw:SetOn(addon.db[def.key]) end
+    return row
+end
+
+local function dropdownRow(page, card, def, indent)
+    local row = rowBase(card, def, indent)
+    local b = button(row, "", 180, 22)
+    b:SetPoint("RIGHT", -12, 0)
+    b.label:ClearAllPoints()
+    b.label:SetPoint("LEFT", 10, 0)
+    local arrow = text(b, 11, C.dim)
+    arrow:SetPoint("RIGHT", -8, 0)
+    arrow:SetText("v")
+    local function current()
+        for _, opt in ipairs(def.options or {}) do
+            if opt.value == addon.db[def.key] then return opt.text end
+        end
+        return tostring(addon.db[def.key])
+    end
+    row.refresh = function() b.label:SetText(current()) end
+    b:SetScript("OnClick", function()
+        if menu and menu:IsShown() and menu.anchor == b then menu:Hide() return end
+        openMenu(b, def.options or {}, addon.db[def.key], function(value)
+            addon.db[def.key] = value
+            row.refresh()
+            if def.onChange then def.onChange(value) end
+        end)
+    end)
+    return row
+end
+
+local function sliderRow(page, card, def, indent)
+    local row = rowBase(card, def, indent)
+    local value = text(row, 12, nil)
+    value:SetPoint("RIGHT", -12, 0)
+    value:SetWidth(def.zeroText and 56 or 40)
+    value:SetJustifyH("RIGHT")
+    onAccent(function() value:SetTextColor(unpack(A.accent)) end)
+
+    local s = CreateFrame("Slider", nil, row)
+    s:SetOrientation("HORIZONTAL")
+    s:SetSize(140, 16)
+    s:SetPoint("RIGHT", value, "LEFT", -10, 0)
+    local track = s:CreateTexture(nil, "BACKGROUND")
+    sliced(track, "Pill", 8)
+    track:SetHeight(6)
+    track:SetPoint("LEFT")
+    track:SetPoint("RIGHT")
+    track:SetVertexColor(unpack(C.trackOff))
+    s:SetThumbTexture(MEDIA .. "Knob")
+    local thumb = s:GetThumbTexture()
+    thumb:SetSize(14, 14)
+    onAccent(function() thumb:SetVertexColor(unpack(A.accent)) end)
+    s:SetMinMaxValues(def.min or 0, def.max or 1)
+    s:SetValueStep(def.step or 1)
+    s:SetObeyStepOnDrag(true)
+
+    local updating = false
+    local function show(v)
+        local step = def.step or 1
+        if def.zeroText and v == 0 then
+            value:SetText(def.zeroText)
+            return
+        end
+        value:SetText(step < 1 and string.format("%.1f", v) or tostring(math.floor(v + 0.5)))
+    end
+    s:SetScript("OnValueChanged", function(_, v)
+        if updating then return end
+        local step = def.step or 1
+        v = math.floor(v / step + 0.5) * step
+        addon.db[def.key] = v
+        show(v)
+        if def.onChange then def.onChange(v) end
+    end)
+    s:EnableMouseWheel(true)
+    s:SetScript("OnMouseWheel", function(self, delta)
+        self:SetValue(self:GetValue() + delta * (def.step or 1))
+    end)
+    row.refresh = function()
+        updating = true
+        s:SetValue(addon.db[def.key] or def.min or 0)
+        updating = false
+        show(addon.db[def.key] or def.min or 0)
+    end
+    return row
+end
+
+local function buttonRow(page, card, def, indent)
+    local row = CreateFrame("Frame", nil, card)
+    row:SetHeight(34)
+    local b = button(row, def.label, 180, 24)
+    b:SetPoint("LEFT", 10 + indent, 0)
+    b:SetScript("OnClick", function() if def.onClick then def.onClick() end end)
+    row.searchText = (def.label or ""):lower()
+    return row
+end
+
+local function subHeaderRow(page, card, def, indent)
+    local row = CreateFrame("Frame", nil, card)
+    row:SetHeight(24)
+    local fs = text(row, 11, C.faint, "OUTLINE")
+    fs:SetPoint("LEFT", 10 + indent, 0)
+    fs:SetText((def.label or ""):upper())
+    row.searchText = (def.label or ""):lower()
+    return row
+end
+
+local ROW_BUILDERS = {
+    checkbox = checkboxRow, dropdown = dropdownRow, slider = sliderRow,
+    button = buttonRow, header = subHeaderRow,
+}
+
+-- Pages
+
+local frame, scroll, scrollThumb, searchBox, settingsButton
+local applyScale
+local pageHead = {}
+local pages = {}
+local activePage, activeCat
+local navButtons = {}
+
+local function newSection(page, title)
+    local section = { rows = {} }
+    if title then
+        section.title = text(page.child, 12, nil, "OUTLINE")
+        section.title:SetText(title:upper())
+        onAccent(function() section.title:SetTextColor(unpack(A.accent)) end)
+    end
+    section.card = CreateFrame("Frame", nil, page.child)
+    rounded(section.card, "BACKGROUND", C.card)
+    rounded(section.card, "BORDER", C.cardEdge, "Ring")
+    page.sections[#page.sections + 1] = section
+    return section
+end
+
+-- Sorts headings alphabetically, and options alphabetically within each
+-- heading. Sub-options stay under their option in their own order; buttons go
+-- last. Options above the first heading stay at the top.
+local function sortName(def)
+    return (def.label or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):lower()
+end
+
+local function sortDefs(defs)
+    local sections = { { items = {} } }
+    for _, def in ipairs(defs) do
+        if def.kind == "header" then
+            sections[#sections + 1] = { header = def, items = {} }
         else
-            stripe:Hide()
-            glow:Hide()
-            text:SetTextColor(unpack(C.textGray))
-            text:SetFont(FONT, 13, "")
+            local items = sections[#sections].items
+            items[#items + 1] = def
         end
     end
 
-    btn:SetScript("OnClick", function()
-        addon.customUI.OpenTab(name)
-    end)
+    local untitled = table.remove(sections, 1)
+    table.sort(sections, function(a, b) return sortName(a.header) < sortName(b.header) end)
+    table.insert(sections, 1, untitled)
 
-    tabButtons[name] = { button = btn, setActive = SetActive }
-    return btn
+    local out = {}
+    for _, section in ipairs(sections) do
+        table.sort(section.items, function(a, b)
+            local aButton, bButton = a.kind == "button", b.kind == "button"
+            if aButton ~= bButton then return bButton end
+            return sortName(a) < sortName(b)
+        end)
+        if section.header then out[#out + 1] = section.header end
+        for _, def in ipairs(section.items) do out[#out + 1] = def end
+    end
+    return out
 end
 
-function addon.customUI.OpenTab(name)
-    if not categoryBuilders[name] then return end
+local function buildPage(cat)
+    local page = { sections = {}, rows = {} }
+    page.child = CreateFrame("Frame", nil, scroll)
+    page.child:SetSize(scroll:GetWidth(), 10)
 
-    activeTab = name
-
-    for tabName, info in pairs(tabButtons) do
-        info.setActive(tabName == name)
+    local defs = sortDefs(record(categoryBuilders[cat.name]))
+    local section
+    local function addRow(def, indent, parentKey)
+        section = section or newSection(page, nil)
+        local make = ROW_BUILDERS[def.kind]
+        if not make then return end
+        local row = make(page, section.card, def, indent)
+        row.parentKey = parentKey
+        section.rows[#section.rows + 1] = row
+        page.rows[#page.rows + 1] = row
     end
 
-    if headerTitle then headerTitle:SetText(name) end
-    if headerDesc then headerDesc:SetText(CATEGORY_DESCRIPTIONS[name] or "") end
-
-    -- Hide all scrollChild children (frames are reused, never orphaned -WoW never GCs frames)
-    local children = { scrollChild:GetChildren() }
-    for _, child in ipairs(children) do
-        child:Hide()
-    end
-
-    if not tabCache[name] then
-        allWidgets = {}
-        categoryBuilders[name]()
-        tabCache[name] = { widgets = allWidgets }
-    end
-
-    allWidgets = tabCache[name].widgets
-
-    for _, entry in ipairs(allWidgets) do
-        if entry.frame and entry.visible ~= false then
-            entry.frame:Show()
+    for _, def in ipairs(defs) do
+        if def.kind == "header" then
+            section = newSection(page, def.label)
+        else
+            addRow(def, 0, nil)
+            if def.kind == "checkbox" and def.children then
+                for _, child in ipairs(def.children) do
+                    addRow(childDef(child), 26, def.key)
+                end
+            end
         end
     end
 
-    RecalcLayout()
-
-    -- Deferred refresh: sliders need track width > 0; toggles skip animation
-    C_Timer.After(0, function()
-        for _, entry in ipairs(allWidgets) do
-            if entry.refresh then entry.refresh(true) end
+    function page:Layout()
+        local filter = searchBox and searchBox:GetText():lower() or ""
+        filter = filter:gsub("^%s+", ""):gsub("%s+$", "")
+        local y = -6
+        for _, sec in ipairs(self.sections) do
+            local rowY, shown = -6, 0
+            for _, row in ipairs(sec.rows) do
+                local visible
+                if filter ~= "" then
+                    visible = row.searchText and row.searchText:find(filter, 1, true) ~= nil
+                else
+                    visible = not row.parentKey or addon.db[row.parentKey]
+                end
+                if visible then
+                    row:ClearAllPoints()
+                    row:SetPoint("TOPLEFT", sec.card, "TOPLEFT", 6, rowY)
+                    row:SetPoint("RIGHT", sec.card, "RIGHT", -6, 0)
+                    row:Show()
+                    rowY = rowY - row:GetHeight() - 2
+                    shown = shown + 1
+                else
+                    row:Hide()
+                end
+            end
+            if shown == 0 then
+                sec.card:Hide()
+                if sec.title then sec.title:Hide() end
+            else
+                if sec.title then
+                    sec.title:ClearAllPoints()
+                    sec.title:SetPoint("TOPLEFT", self.child, "TOPLEFT", 6, y)
+                    sec.title:Show()
+                    y = y - 20
+                end
+                local h = -rowY + 4
+                sec.card:ClearAllPoints()
+                sec.card:SetPoint("TOPLEFT", self.child, "TOPLEFT", 0, y)
+                sec.card:SetPoint("RIGHT", self.child, "RIGHT", 0, 0)
+                sec.card:SetHeight(h)
+                sec.card:Show()
+                y = y - h - 16
+            end
         end
-    end)
+        self.child:SetHeight(-y + 10)
+        scroll:UpdateScrollChildRect()
+        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), scroll:GetVerticalScrollRange()))
+        scroll:UpdateThumb()
+    end
 
-    -- Reset scroll instantly (cancel any in-flight smooth scroll)
-    scrollFrame.targetScroll = nil
-    scrollFrame:SetVerticalScroll(0)
-    if addon._updateScrollbar then addon._updateScrollbar() end
+    function page:Refresh()
+        for _, row in ipairs(self.rows) do
+            if row.refresh then row.refresh() end
+        end
+        self:Layout()
+    end
+
+    return page
 end
 
-local function BuildMainFrame()
-    mainFrame = CreateFrame("Frame", "MysteriousQoL_SettingsFrame", UIParent, "BackdropTemplate")
-    mainFrame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
-    mainFrame:SetPoint("CENTER")
-    mainFrame:SetFrameStrata("HIGH")
-    mainFrame:SetFrameLevel(100)
-    mainFrame:SetClampedToScreen(true)
-    mainFrame:SetMovable(true)
-    mainFrame:EnableMouse(true)
-    mainFrame:RegisterForDrag("LeftButton")
-    mainFrame:SetScript("OnDragStart", mainFrame.StartMoving)
-    mainFrame:SetScript("OnDragStop", mainFrame.StopMovingOrSizing)
-    mainFrame:SetScript("OnShow", function()
-        ApplyPanelScale(addon.db.settings_panel_scale, false)
+local function openPage(cat)
+    activeCat = cat
+    if activePage then activePage.child:Hide() end
+    pages[cat.name] = pages[cat.name] or buildPage(cat)
+    activePage = pages[cat.name]
+    activePage.child:Show()
+    scroll:SetScrollChild(activePage.child)
+    scroll:SetVerticalScroll(0)
+
+    pageHead.icon.icon:SetTexture(cat.icon)
+    pageHead.title:SetText(cat.name)
+    pageHead.desc:SetText(cat.desc)
+    for _, nav in ipairs(navButtons) do nav:SetActive(nav.cat == cat) end
+    if settingsButton then settingsButton:SetActive(cat.footer) end
+    activePage:Refresh()
+end
+
+local function navButton(parent, cat, index)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetHeight(48)
+    b:SetPoint("TOPLEFT", 12, -12 - (index - 1) * 54)
+    b:SetPoint("TOPRIGHT", -12, -12 - (index - 1) * 54)
+    local fill = rounded(b, "BACKGROUND")
+    local ring = rounded(b, "BORDER", nil, "Ring")
+    local hl = rounded(b, "HIGHLIGHT", C.hover)
+    hl:SetBlendMode("ADD")
+    local icon = emblem(b, 36, cat.icon)
+    icon:SetPoint("LEFT", 6, 0)
+    local name = text(b, 13)
+    name:SetPoint("LEFT", icon, "RIGHT", 10, 0)
+    name:SetText(cat.name)
+    b.cat = cat
+    function b:SetActive(on)
+        self.active = on
+        fill:SetShown(on)
+        ring:SetShown(on)
+        fill:SetVertexColor(unpack(A.deep))
+        ring:SetVertexColor(unpack(A.dim))
+        name:SetTextColor(unpack(on and A.accent or C.dim))
+    end
+    onAccent(function() b:SetActive(b.active) end)
+    b:SetScript("OnClick", function() openPage(cat) end)
+    return b
+end
+
+local SCALE_MIN, SCALE_MAX, EDGE_PAD = 0.6, 2.0, 24
+
+local function maxScale()
+    local w, h = UIParent:GetWidth() or 0, UIParent:GetHeight() or 0
+    if w <= 0 or h <= 0 then return SCALE_MAX end
+    local fit = math.min((w - EDGE_PAD * 2) / WIDTH, (h - EDGE_PAD * 2) / HEIGHT)
+    return math.max(0.1, math.min(SCALE_MAX, fit))
+end
+
+applyScale = function(value, persist)
+    local top = maxScale()
+    local scale = math.max(math.min(SCALE_MIN, top), math.min(top, tonumber(value) or 1))
+    if frame then frame:SetScale(scale) end
+    if persist then addon.db.settings_panel_scale = scale end
+    return scale
+end
+
+local function createFrame()
+    -- Start in the accent picked last time.
+    local saved = addon.db.settings_accent
+    if ACCENTS[saved] then
+        accentName = saved
+        A = ACCENTS[saved]
+    end
+
+    frame = CreateFrame("Frame", "MysteriousQoL_SettingsFrame", UIParent)
+    frame:SetSize(WIDTH, HEIGHT)
+    frame:SetPoint("CENTER")
+    frame:SetFrameStrata("HIGH")
+    frame:SetClampedToScreen(true)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:SetToplevel(true)
+    tinsert(UISpecialFrames, frame:GetName())
+    rounded(frame, "BACKGROUND", C.bg)
+    local edge = rounded(frame, "BORDER", nil, "Ring")
+    onAccent(function() edge:SetVertexColor(A.dim[1], A.dim[2], A.dim[3], 0.8) end)
+
+    -- Banner
+    local banner = CreateFrame("Frame", nil, frame)
+    banner:SetPoint("TOPLEFT", 2, -2)
+    banner:SetPoint("TOPRIGHT", -2, -2)
+    banner:SetHeight(BANNER_H)
+    banner:EnableMouse(true)
+    banner:RegisterForDrag("LeftButton")
+    banner:SetScript("OnDragStart", function() frame:StartMoving() end)
+    banner:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
+    local glow = banner:CreateTexture(nil, "BACKGROUND")
+    glow:SetTexture(WHITE)
+    glow:SetAllPoints()
+    onAccent(function()
+        glow:SetGradient("VERTICAL", CreateColor(0, 0, 0, 0),
+            CreateColor(A.deep[1], A.deep[2], A.deep[3], 0.9))
     end)
-    MakeBackdrop(mainFrame, C.bgMain, C.primaryBorder)
-    ApplyPanelScale(addon.db.settings_panel_scale, true)
-    mainFrame:Hide()
-
-    UIParent:HookScript("OnSizeChanged", function()
-        -- Preserve the user's preferred value in the DB while temporarily
-        -- fitting the frame to a smaller window or UI scale.
-        ApplyPanelScale(addon.db.settings_panel_scale, false)
+    local line = banner:CreateTexture(nil, "ARTWORK")
+    line:SetHeight(1)
+    line:SetPoint("BOTTOMLEFT", 12, 0)
+    line:SetPoint("BOTTOMRIGHT", -12, 0)
+    line:SetTexture(WHITE)
+    onAccent(function()
+        line:SetGradient("HORIZONTAL", CreateColor(A.dim[1], A.dim[2], A.dim[3], 0),
+            CreateColor(A.dim[1], A.dim[2], A.dim[3], 1))
     end)
 
-    table.insert(UISpecialFrames, "MysteriousQoL_SettingsFrame")
-
-    -- Top accent bar
-    local accent = mainFrame:CreateTexture(nil, "ARTWORK")
-    accent:SetHeight(2)
-    accent:SetPoint("TOPLEFT", 1, -1)
-    accent:SetPoint("TOPRIGHT", -1, -1)
-    accent:SetColorTexture(unpack(C.primary))
-
-    -- Sidebar panel (full height, left)
-    local sidebar = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
-    sidebar:SetWidth(SIDEBAR_WIDTH)
-    sidebar:SetPoint("TOPLEFT", 1, -3)
-    sidebar:SetPoint("BOTTOMLEFT", 1, 1)
-    MakeBackdrop(sidebar, C.bgSidebar)
-
-    -- Sidebar / content divider line
-    local divider = mainFrame:CreateTexture(nil, "ARTWORK")
-    divider:SetWidth(1)
-    divider:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 0, 0)
-    divider:SetPoint("BOTTOMLEFT", sidebar, "BOTTOMRIGHT", 0, 0)
-    divider:SetColorTexture(unpack(C.primaryDim))
-
-    -- Sidebar header (addon title + version)
-    local sbTitle = sidebar:CreateFontString(nil, "OVERLAY")
-    sbTitle:SetFont(FONT, 17, "OUTLINE")
-    sbTitle:SetPoint("TOPLEFT", 16, -16)
-    sbTitle:SetTextColor(unpack(C.primaryBright))
-    sbTitle:SetText("MysteriousQoL")
-
-    local sbVersion = sidebar:CreateFontString(nil, "OVERLAY")
-    sbVersion:SetFont(FONT, 10, "")
-    sbVersion:SetPoint("TOPLEFT", sbTitle, "BOTTOMLEFT", 1, -2)
-    sbVersion:SetTextColor(unpack(C.textDim))
-    sbVersion:SetText("v" .. (C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"))
-
-    -- Separator under sidebar header
-    local sbSep = sidebar:CreateTexture(nil, "ARTWORK")
-    sbSep:SetHeight(1)
-    sbSep:SetPoint("TOPLEFT", 12, -64)
-    sbSep:SetPoint("TOPRIGHT", -12, -64)
-    sbSep:SetColorTexture(unpack(C.primaryDim))
-
-    -- Sidebar body (entry container)
-    sidebarBody = CreateFrame("Frame", nil, sidebar)
-    sidebarBody:SetPoint("TOPLEFT", 0, -76)
-    sidebarBody:SetPoint("TOPRIGHT", 0, -76)
-    sidebarBody:SetPoint("BOTTOM", 0, 40)
-
-    local changelogButton = CreateFrame("Button", nil, sidebar, "BackdropTemplate")
-    changelogButton:SetSize(104, 22)
-    changelogButton:SetPoint("BOTTOMLEFT", 12, 10)
-    MakeBackdrop(changelogButton, C.bgHeader, C.primaryDim)
-    local changelogText = changelogButton:CreateFontString(nil, "OVERLAY")
-    changelogText:SetFont(FONT, 10, "")
-    changelogText:SetPoint("CENTER")
-    changelogText:SetTextColor(unpack(C.textGray))
-    changelogText:SetText("Changelog")
-    changelogButton:SetScript("OnEnter", function()
-        changelogButton:SetBackdropBorderColor(unpack(C.primaryBright))
-        changelogText:SetTextColor(unpack(C.text))
+    local logo = emblem(banner, 54, "Interface\\AddOns\\" .. addonName .. "\\MysteriousQoL")
+    logo.icon:SetTexCoord(0, 1, 0, 1)
+    logo:SetPoint("LEFT", 16, 0)
+    logo:EnableMouse(true)
+    logo:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
+        GameTooltip:SetText("Created for <Mysterious Intent> on Tichondrius & Forever: RP",
+            A.accent[1], A.accent[2], A.accent[3])
+        GameTooltip:Show()
     end)
-    changelogButton:SetScript("OnLeave", function()
-        changelogButton:SetBackdropBorderColor(unpack(C.primaryDim))
-        changelogText:SetTextColor(unpack(C.textGray))
-    end)
-    changelogButton:SetScript("OnClick", function()
-        addon.MI_Changelog_Toggle()
+    logo:SetScript("OnLeave", GameTooltip_Hide)
+    -- Dragging from the logo still moves the panel.
+    logo:RegisterForDrag("LeftButton")
+    logo:SetScript("OnDragStart", function() frame:StartMoving() end)
+    logo:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
+    local title = text(banner, 22, nil, "OUTLINE")
+    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 14, -6)
+    title:SetText("MysteriousQoL")
+    onAccent(function() title:SetTextColor(unpack(A.accent)) end)
+    local sub = text(banner, 11, C.dim)
+    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
+    sub:SetText("Mysterious Quality of Life improvements")
+
+    local close = button(banner, "", 24, 24)
+    close:SetPoint("TOPRIGHT", -10, -10)
+    -- The X is a symmetric texture filling the button, so it stays centered
+    -- (a font glyph or rotated lines drift by a pixel).
+    local cross = close:CreateTexture(nil, "OVERLAY")
+    cross:SetTexture(MEDIA .. "Close")
+    cross:SetPoint("TOPLEFT", 4, -4)
+    cross:SetPoint("BOTTOMRIGHT", -4, 4)
+    onAccent(function() cross:SetVertexColor(unpack(A.accent)) end)
+    close:SetScript("OnClick", function() frame:Hide() end)
+    local accentBtn = button(banner, "", 90, 24)
+    accentBtn:SetPoint("RIGHT", close, "LEFT", -8, 0)
+    local function accentLabel() accentBtn.label:SetText("Accent: " .. ACCENT_LABELS[accentName]) end
+    accentLabel()
+    accentBtn:SetScript("OnClick", function()
+        setAccent(nextAccent())
+        accentLabel()
     end)
 
-    -- Header banner (above content, right of sidebar)
-    local header = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
-    header:SetHeight(HEADER_HEIGHT)
-    header:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 1, 0)
-    header:SetPoint("TOPRIGHT", -1, -3)
-    MakeBackdrop(header, C.bgHeader)
+    -- Sidebar
+    local sidebar = CreateFrame("Frame", nil, frame)
+    sidebar:SetPoint("TOPLEFT", 8, -(BANNER_H + 8))
+    sidebar:SetPoint("BOTTOMLEFT", 8, 8)
+    sidebar:SetWidth(SIDEBAR_W)
+    rounded(sidebar, "BACKGROUND", C.sidebar)
+    local index = 0
+    for _, cat in ipairs(CATEGORIES) do
+        if categoryBuilders[cat.name] and not cat.footer then
+            index = index + 1
+            navButtons[#navButtons + 1] = navButton(sidebar, cat, index)
+        end
+    end
 
-    -- Header glow stripe along the bottom (gradient: primary fade)
-    local headerGlow = header:CreateTexture(nil, "ARTWORK")
-    headerGlow:SetTexture(BAR_TEX)
-    headerGlow:SetHeight(36)
-    headerGlow:SetPoint("BOTTOMLEFT", 0, 1)
-    headerGlow:SetPoint("BOTTOMRIGHT", 0, 1)
-    headerGlow:SetGradient("VERTICAL",
-        CreateColor(0, 0, 0, 0),
-        CreateColor(C.primaryGlow[1], C.primaryGlow[2], C.primaryGlow[3], C.primaryGlow[4]))
+    -- Small Settings button above Changelog for the addon's own options.
+    for _, cat in ipairs(CATEGORIES) do
+        if cat.footer and categoryBuilders[cat.name] then
+            settingsButton = button(sidebar, cat.name, SIDEBAR_W - 24, 24)
+            settingsButton:SetPoint("BOTTOM", 0, 74)
+            settingsButton:SetScript("OnClick", function() openPage(cat) end)
+            function settingsButton:SetActive(on)
+                self.active = on and true or false
+                self.bg:SetVertexColor(unpack(self.active and A.deep or C.card))
+            end
+            onAccent(function() settingsButton:SetActive(settingsButton.active) end)
+        end
+    end
 
-    -- Header bottom divider
-    local headerDivider = header:CreateTexture(nil, "OVERLAY")
-    headerDivider:SetHeight(1)
-    headerDivider:SetPoint("BOTTOMLEFT", 0, 0)
-    headerDivider:SetPoint("BOTTOMRIGHT", 0, 0)
-    headerDivider:SetColorTexture(unpack(C.primary))
+    local changelog = button(sidebar, "Changelog", SIDEBAR_W - 24, 24)
+    changelog:SetPoint("BOTTOM", 0, 44)
+    changelog:SetScript("OnClick", function()
+        if addon.MI_Changelog_Toggle then addon.MI_Changelog_Toggle() end
+    end)
+    local version = text(sidebar, 10, C.faint)
+    version:SetPoint("BOTTOM", 0, 24)
+    local v = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
+    version:SetText("Version " .. (v or "?"))
+    local author = text(sidebar, 9, C.faint)
+    author:SetPoint("TOP", version, "BOTTOM", 0, -3)
+    author:SetText("Author: UmbraChimera#1824")
 
-    headerTitle = header:CreateFontString(nil, "OVERLAY")
-    headerTitle:SetFont(FONT, 22, "OUTLINE")
-    headerTitle:SetPoint("TOPLEFT", 24, -16)
-    headerTitle:SetTextColor(unpack(C.text))
-    headerTitle:SetText("")
+    -- Page header: emblem, title, description, search
+    local content = CreateFrame("Frame", nil, frame)
+    content:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 16, 0)
+    content:SetPoint("BOTTOMRIGHT", -16, 8)
+    pageHead.icon = emblem(content, 48, CATEGORIES[1].icon)
+    pageHead.icon:SetPoint("TOPLEFT", 0, -6)
+    pageHead.title = text(content, 20, nil, "OUTLINE")
+    pageHead.title:SetPoint("TOPLEFT", pageHead.icon, "TOPRIGHT", 12, -4)
+    onAccent(function() pageHead.title:SetTextColor(unpack(A.accent)) end)
+    pageHead.desc = text(content, 12, C.dim)
+    pageHead.desc:SetPoint("TOPLEFT", pageHead.title, "BOTTOMLEFT", 0, -5)
 
-    headerDesc = header:CreateFontString(nil, "OVERLAY")
-    headerDesc:SetFont(FONT, 11, "")
-    headerDesc:SetPoint("TOPLEFT", headerTitle, "BOTTOMLEFT", 2, -4)
-    headerDesc:SetTextColor(unpack(C.textGray))
-    headerDesc:SetText("")
+    local searchFrame = CreateFrame("Frame", nil, content)
+    searchFrame:SetSize(200, 26)
+    searchFrame:SetPoint("TOPRIGHT", 0, -16)
+    rounded(searchFrame, "BACKGROUND", C.card)
+    local searchRing = rounded(searchFrame, "BORDER", C.cardEdge, "Ring")
+    searchBox = CreateFrame("EditBox", nil, searchFrame)
+    searchBox:SetPoint("TOPLEFT", 10, 0)
+    searchBox:SetPoint("BOTTOMRIGHT", -10, 0)
+    searchBox:SetFont(FONT, 12, "")
+    searchBox:SetTextColor(unpack(C.text))
+    searchBox:SetAutoFocus(false)
+    local hint = text(searchFrame, 12, C.faint)
+    hint:SetPoint("LEFT", 10, 0)
+    hint:SetText("Search")
+    searchBox:SetScript("OnTextChanged", function(self)
+        hint:SetShown(self:GetText() == "")
+        if activePage then activePage:Layout() end
+    end)
+    searchBox:SetScript("OnEscapePressed", function(self)
+        self:SetText("")
+        self:ClearFocus()
+    end)
+    searchBox:SetScript("OnEditFocusGained", function() searchRing:SetVertexColor(unpack(A.dim)) end)
+    searchBox:SetScript("OnEditFocusLost", function() searchRing:SetVertexColor(unpack(C.cardEdge)) end)
 
-    -- Close button (top-right)
-    local close = CreateFrame("Button", nil, mainFrame, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -2, -2)
-    close:SetFrameLevel(mainFrame:GetFrameLevel() + 2)
-    close:SetScript("OnClick", function() mainFrame:Hide() end)
+    -- Scroll area
+    scroll = CreateFrame("ScrollFrame", nil, content)
+    scroll:SetPoint("TOPLEFT", 0, -PAGE_HEAD_H)
+    scroll:SetPoint("BOTTOMRIGHT", -12, 0)
+    scroll:EnableMouseWheel(true)
+    scrollThumb = content:CreateTexture(nil, "OVERLAY")
+    scrollThumb:SetTexture(WHITE)
+    scrollThumb:SetWidth(3)
+    onAccent(function() scrollThumb:SetVertexColor(A.dim[1], A.dim[2], A.dim[3], 0.9) end)
 
-    -- Content area (below header, right of sidebar)
-    contentFrame = CreateFrame("Frame", nil, mainFrame)
-    contentFrame:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, 0)
-    contentFrame:SetPoint("BOTTOMRIGHT", -1, 1)
-
-    scrollFrame = CreateFrame("ScrollFrame", nil, contentFrame)
-    scrollFrame:SetPoint("TOPLEFT", CONTENT_PAD_L, 0)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -(CONTENT_PAD_R + SCROLLBAR_WIDTH + 4), 0)
-    scrollFrame:EnableMouseWheel(true)
-
-    scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(FRAME_WIDTH - SIDEBAR_WIDTH - CONTENT_PAD_L - CONTENT_PAD_R - SCROLLBAR_WIDTH - 4 - 2)
-    scrollChild:SetHeight(1)
-    scrollFrame:SetScrollChild(scrollChild)
-
-    -- Custom scrollbar
-    local scrollTrack = CreateFrame("Frame", nil, contentFrame)
-    scrollTrack:SetWidth(SCROLLBAR_WIDTH)
-    scrollTrack:SetPoint("TOPRIGHT", -3, -6)
-    scrollTrack:SetPoint("BOTTOMRIGHT", -3, 20)
-
-    local scrollTrackBg = scrollTrack:CreateTexture(nil, "BACKGROUND")
-    scrollTrackBg:SetAllPoints()
-    scrollTrackBg:SetColorTexture(0.08, 0.08, 0.08, 0.6)
-
-    local scrollThumb = CreateFrame("Frame", nil, scrollTrack)
-    scrollThumb:SetWidth(SCROLLBAR_WIDTH)
-    scrollThumb:SetPoint("TOP", scrollTrack, "TOP", 0, 0)
-
-    local scrollThumbTex = scrollThumb:CreateTexture(nil, "ARTWORK")
-    scrollThumbTex:SetAllPoints()
-    scrollThumbTex:SetColorTexture(C.primary[1], C.primary[2], C.primary[3], 0.7)
-
-    local function UpdateScrollbar()
-        local viewHeight = scrollFrame:GetHeight()
-        local contentHeight = scrollChild:GetHeight()
-        local trackHeight = scrollTrack:GetHeight()
-        if contentHeight <= viewHeight or trackHeight <= 0 then
+    function scroll:UpdateThumb()
+        local range = self:GetVerticalScrollRange()
+        local h = self:GetHeight()
+        if range <= 0 or h <= 0 then
             scrollThumb:Hide()
             return
         end
-        scrollThumb:Show()
-        local thumbSize = math.max(24, (viewHeight / contentHeight) * trackHeight)
-        scrollThumb:SetHeight(thumbSize)
-        local scrollRange = contentHeight - viewHeight
-        local current = scrollFrame:GetVerticalScroll()
-        local pct = current / scrollRange
-        local travel = trackHeight - thumbSize
+        local thumbH = math.max(30, h * h / (h + range))
+        local offset = (h - thumbH) * (self:GetVerticalScroll() / range)
         scrollThumb:ClearAllPoints()
-        scrollThumb:SetPoint("TOP", scrollTrack, "TOP", 0, -(pct * travel))
+        scrollThumb:SetPoint("TOPRIGHT", self, "TOPRIGHT", 10, -offset)
+        scrollThumb:SetHeight(thumbH)
+        scrollThumb:Show()
     end
 
-    addon._updateScrollbar = UpdateScrollbar
+    scroll:SetScript("OnMouseWheel", function(self, delta)
+        local target = self:GetVerticalScroll() - delta * SCROLL_STEP
+        target = math.max(0, math.min(self:GetVerticalScrollRange(), target))
+        self:SetVerticalScroll(target)
+        self:UpdateThumb()
+    end)
+    scroll:SetScript("OnSizeChanged", function(self, w)
+        for _, page in pairs(pages) do page.child:SetWidth(w) end
+        if activePage then activePage:Layout() end
+    end)
 
-    -- Smooth scroll: per-frame lerp toward targetScroll; detaches when arrived
-    local function StartScrollAnim()
-        if scrollFrame:GetScript("OnUpdate") then return end
-        scrollFrame:SetScript("OnUpdate", function(self, elapsed)
-            local target = self.targetScroll
-            if not target then
-                self:SetScript("OnUpdate", nil)
-                return
-            end
-            local cur = self:GetVerticalScroll()
-            local diff = target - cur
-            if math.abs(diff) < 0.5 then
-                self:SetVerticalScroll(target)
-                self.targetScroll = nil
-                UpdateScrollbar()
-                self:SetScript("OnUpdate", nil)
-                return
-            end
-            self:SetVerticalScroll(cur + diff * SCROLL_SPEED * elapsed)
-            UpdateScrollbar()
-        end)
+    -- Resize grip: drag right to grow, left to shrink. Snaps to 5% steps.
+    local grip = CreateFrame("Button", nil, frame)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", -4, 4)
+    for _, pos in ipairs({ { -1, 1 }, { -5, 1 }, { -1, 5 }, { -9, 1 }, { -5, 5 }, { -1, 9 } }) do
+        local dot = grip:CreateTexture(nil, "OVERLAY")
+        dot:SetSize(2, 2)
+        dot:SetPoint("BOTTOMRIGHT", pos[1], pos[2])
+        dot:SetTexture(WHITE)
+        onAccent(function() dot:SetVertexColor(A.dim[1], A.dim[2], A.dim[3], 0.9) end)
     end
-
-    scrollFrame:SetScript("OnMouseWheel", function(self, delta)
-        local maxScroll = math.max(0, (scrollChild:GetHeight() or 0) - self:GetHeight())
-        local from = self.targetScroll or self:GetVerticalScroll()
-        self.targetScroll = math.max(0, math.min(maxScroll, from - delta * 60))
-        StartScrollAnim()
-    end)
-
-    -- Drag scrollbar thumb (instant, cancels smooth scroll)
-    local thumbDragging = false
-    local thumbDragStart = 0
-    local thumbScrollStart = 0
-    scrollThumb:EnableMouse(true)
-    scrollThumb:SetScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" then
-            thumbDragging = true
-            local _, cy = GetCursorPosition()
-            thumbDragStart = cy / scrollTrack:GetEffectiveScale()
-            thumbScrollStart = scrollFrame:GetVerticalScroll()
-            scrollFrame.targetScroll = nil
-        end
-    end)
-    scrollThumb:SetScript("OnMouseUp", function() thumbDragging = false end)
-    scrollThumb:SetScript("OnUpdate", function()
-        if not thumbDragging then return end
-        local _, cy = GetCursorPosition()
-        cy = cy / scrollTrack:GetEffectiveScale()
-        local delta = thumbDragStart - cy
-        local trackHeight = scrollTrack:GetHeight()
-        local thumbSize = scrollThumb:GetHeight()
-        local travel = trackHeight - thumbSize
-        if travel <= 0 then return end
-        local scrollRange = scrollChild:GetHeight() - scrollFrame:GetHeight()
-        local newScroll = thumbScrollStart + (delta / travel) * scrollRange
-        newScroll = math.max(0, math.min(scrollRange, newScroll))
-        scrollFrame:SetVerticalScroll(newScroll)
-        UpdateScrollbar()
-    end)
-
-    scrollThumb:SetScript("OnEnter", function()
-        scrollThumbTex:SetColorTexture(C.primaryBright[1], C.primaryBright[2], C.primaryBright[3], 0.9)
-    end)
-    scrollThumb:SetScript("OnLeave", function()
-        if not thumbDragging then
-            scrollThumbTex:SetColorTexture(C.primary[1], C.primary[2], C.primary[3], 0.7)
-        end
-    end)
-
-    addon._settingsFrame = mainFrame
-
-    -- Resize grip (bottom-right corner) -scales the panel
-    local grip = CreateFrame("Frame", nil, mainFrame)
-    grip:SetSize(14, 14)
-    grip:SetPoint("BOTTOMRIGHT", -2, 2)
-    grip:EnableMouse(true)
-    local function MakeDot(x, y)
-        local t = grip:CreateTexture(nil, "OVERLAY")
-        t:SetSize(3, 3); t:SetPoint("BOTTOMRIGHT", x, y)
-        t:SetColorTexture(C.primary[1], C.primary[2], C.primary[3], 0.6)
+    local dragging, startX, startScale = false, 0, 1
+    local function onDrag()
+        applyScale(startScale + (GetCursorPosition() - startX) / 500, false)
     end
-    MakeDot(-1, 1); MakeDot(-5, 1); MakeDot(-1, 5)
-    MakeDot(-9, 1); MakeDot(-5, 5); MakeDot(-1, 9)
-    grip:SetScript("OnEnter", function()
-        for _, tex in ipairs({grip:GetRegions()}) do tex:SetAlpha(1) end
-    end)
-    grip:SetScript("OnLeave", function()
-        for _, tex in ipairs({grip:GetRegions()}) do tex:SetAlpha(0.6) end
-    end)
-    local gripDragging, gripStartX, gripStartScale = false, 0, 1.0
     grip:SetScript("OnMouseDown", function(_, btn)
         if btn ~= "LeftButton" then return end
-        gripDragging = true
-        gripStartX = GetCursorPosition()
-        gripStartScale = mainFrame:GetScale()
+        dragging = true
+        startX = GetCursorPosition()
+        startScale = frame:GetScale()
+        grip:SetScript("OnUpdate", onDrag)
     end)
     grip:SetScript("OnMouseUp", function()
-        if gripDragging then
-            local snapped = math.floor(mainFrame:GetScale() / 0.05 + 0.5) * 0.05
-            ApplyPanelScale(snapped, true)
+        if dragging then
+            applyScale(math.floor(frame:GetScale() / 0.05 + 0.5) * 0.05, true)
         end
-        gripDragging = false
+        dragging = false
+        grip:SetScript("OnUpdate", nil)
     end)
-    grip:SetScript("OnUpdate", function()
-        if not gripDragging then return end
-        local cx = GetCursorPosition()
-        local newScale = gripStartScale + (cx - gripStartX) / 500
-        ApplyPanelScale(newScale, false)
+
+    -- Keep the saved scale, but shrink to fit a smaller window or UI scale.
+    UIParent:HookScript("OnSizeChanged", function()
+        applyScale(addon.db.settings_panel_scale, false)
     end)
+    applyScale(addon.db.settings_panel_scale, false)
+
+    frame:SetScript("OnShow", function()
+        applyScale(addon.db.settings_panel_scale, false)
+        if activePage then activePage:Refresh() end
+    end)
+    frame:SetScript("OnHide", function()
+        if menu then menu:Hide() end
+    end)
+
+    if navButtons[1] then openPage(navButtons[1].cat) end
 end
 
-function addon.MI_SettingsUI_Init()
-    BuildMainFrame()
+-- Shared look for other windows (welcome popup, setup helper).
+local function loadSavedAccent()
+    local saved = addon.db and addon.db.settings_accent
+    if ACCENTS[saved] then
+        accentName = saved
+        A = ACCENTS[saved]
+    end
 end
 
-function addon.MI_SettingsUI_BuildTabs()
-    local order = { "General", "UI", "Reminders", "Fun" }
-    local validTabs = {}
-    for _, name in ipairs(order) do
-        if categoryBuilders[name] then
-            table.insert(validTabs, name)
+UI.Style = {
+    Rounded = rounded, Text = text, Emblem = emblem, Button = button, Switch = switch,
+    OnAccent = onAccent, Colors = C, LoadAccent = loadSavedAccent,
+    Accent = function() return A end,
+    Media = MEDIA, Font = FONT, White = WHITE,
+}
+
+-- Finds an option by its setting key in any category, for the setup helper.
+-- Includes sub-options. nil when this game version or class does not have it.
+local optionIndex
+function UI.FindOption(key)
+    if not optionIndex then
+        optionIndex = {}
+        for _, cat in ipairs(CATEGORIES) do
+            local builder = categoryBuilders[cat.name]
+            if builder then
+                for _, def in ipairs(record(builder)) do
+                    if def.key then optionIndex[def.key] = def end
+                    for _, child in ipairs(def.children or {}) do
+                        if child.key then optionIndex[child.key] = childDef(child) end
+                    end
+                end
+            end
         end
     end
-
-    for i, name in ipairs(validTabs) do
-        CreateSidebarEntry(sidebarBody, name, i)
-    end
-
-    if validTabs[1] then
-        addon.customUI.OpenTab(validTabs[1])
-    end
+    return optionIndex[key]
 end
 
+-- Built on first open, once every category has registered.
+function UI.Toggle()
+    if not frame then
+        createFrame()
+        frame:Show()
+        return
+    end
+    frame:SetShown(not frame:IsShown())
+end
+
+-- Refreshes switches after another window (the setup helper) changed settings.
+function UI.RefreshOpenPage()
+    if activePage and frame and frame:IsShown() then activePage:Refresh() end
+end
+
+-- Rebuilds every page, e.g. after the debug option changes which options show.
+-- Old page frames are hidden and dropped (WoW never frees frames, but this is rare).
+function UI.Rebuild()
+    optionIndex = nil
+    if not frame then return end
+    for _, page in pairs(pages) do page.child:Hide() end
+    pages = {}
+    activePage = nil
+    if activeCat then openPage(activeCat) end
+end
+
+function UI.OpenTab(name)
+    if not frame then createFrame() end
+    for _, cat in ipairs(CATEGORIES) do
+        if cat.name == name and categoryBuilders[name] then openPage(cat) end
+    end
+    frame:Show()
+end
+
+-- "Reset Settings Panel": back to 100% and the middle of the screen.
 function addon.MI_SettingsUI_ResetLayout()
-    if not mainFrame then return end
-
-    ApplyPanelScale(1.0, true)
-    mainFrame:ClearAllPoints()
-    mainFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-end
-
-function addon.customUI.Toggle()
-    if not mainFrame then return end
-    if mainFrame:IsShown() then
-        mainFrame:Hide()
-    else
-        mainFrame:Show()
-    end
+    addon.db.settings_panel_scale = 1.0
+    if not frame then return end
+    applyScale(1.0, true)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 end

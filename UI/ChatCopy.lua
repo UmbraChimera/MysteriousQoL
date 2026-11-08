@@ -13,9 +13,8 @@ local copyFrame, copyEdit, copyScroll
 local function ResizeCopyEdit()
     if not copyEdit or not copyScroll then return end
 
-    -- A ScrollFrame derives its range from the scroll child's dimensions.  A
-    -- multiline EditBox does not grow itself to match its text, so explicitly
-    -- size it from the number of wrapped lines after its final width is known.
+    -- The edit box doesn't grow with its text, so size it by line count or the
+    -- scroll frame won't scroll all the way down.
     local width = math.max(1, copyScroll:GetWidth() - 4)
     copyEdit:SetWidth(width)
 
@@ -57,38 +56,33 @@ local function BuildCopyFrame()
 
     table.insert(UISpecialFrames, "MysteriousQoL_ChatCopyFrame")
 
-    -- Top accent
     local accent = copyFrame:CreateTexture(nil, "ARTWORK")
     accent:SetHeight(2)
     accent:SetPoint("TOPLEFT", 1, -1)
     accent:SetPoint("TOPRIGHT", -1, -1)
     accent:SetColorTexture(0, 0.8, 0.8, 1)
 
-    -- Title
     local title = copyFrame:CreateFontString(nil, "OVERLAY")
     title:SetFont(FONT, 13, "OUTLINE")
     title:SetPoint("TOPLEFT", 10, -8)
     title:SetTextColor(0, 0.8, 0.8, 1)
     title:SetText("Chat Copy")
 
-    -- Hint
     local hint = copyFrame:CreateFontString(nil, "OVERLAY")
     hint:SetFont(FONT, 10, "")
     hint:SetPoint("LEFT", title, "RIGHT", 10, 0)
     hint:SetTextColor(0.5, 0.5, 0.5, 1)
     hint:SetText("Ctrl+A to select all, Ctrl+C to copy")
 
-    -- Close button
     local close = CreateFrame("Button", nil, copyFrame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)
     close:SetScript("OnClick", function() copyFrame:Hide() end)
 
-    -- Scroll frame
     copyScroll = CreateFrame("ScrollFrame", "MysteriousQoL_ChatCopyScroll", copyFrame, "UIPanelScrollFrameTemplate")
     copyScroll:SetPoint("TOPLEFT", 8, -28)
     copyScroll:SetPoint("BOTTOMRIGHT", -28, 8)
 
-    -- EditBox (read-only: any edit attempts revert to the original text)
+    -- Read only, typing puts the text back
     copyEdit = CreateFrame("EditBox", nil, copyScroll)
     copyEdit:SetMultiLine(true)
     copyEdit:SetAutoFocus(false)
@@ -115,11 +109,11 @@ local function BuildCopyFrame()
 end
 
 local function CleanText(text)
-    text = text:gsub("|K.-|k", "???")       -- encrypted/secret values
+    text = text:gsub("|K.-|k", "???") -- hidden names (BattleTags etc)
     if StripHyperlinks then
         return StripHyperlinks(text, false, true)
     end
-    -- Fallback if StripHyperlinks unavailable
+    -- No StripHyperlinks on this client
     text = text:gsub("|c%x%x%x%x%x%x%x%x", "")
     text = text:gsub("|r", "")
     text = text:gsub("|T.-|t", "")
@@ -141,7 +135,7 @@ local function GetChatMessages(chatFrame)
         end
     end
 
-    -- Fallback: historyBuffer
+    -- Some chat frames only have their history buffer
     if #lines == 0 then
         local buffer = chatFrame.historyBuffer
         if buffer then

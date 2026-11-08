@@ -22,7 +22,7 @@ local campfireFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_CampfireRem
     width    = 600,
     height   = 60,
     strata   = "HIGH",
-    text     = "Stay a while and listen",
+    text     = "Stay a while and listen...",
 })
 
 local function shouldPrompt()

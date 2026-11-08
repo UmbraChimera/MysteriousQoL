@@ -27,9 +27,8 @@ local VALID_FRAME_POINTS = {
     BOTTOMRIGHT = true,
 }
 
--- Stable priority for collapsing the pre-1.3 per-feature channel settings into
--- the single shared channel. The first valid non-default value wins; if every
--- legacy value is Master, Master is retained.
+-- Before 1.3 each feature had its own sound channel. When merging them into
+-- one, the first one that isn't Master wins.
 local LEGACY_SOUND_CHANNEL_KEYS = {
     "fun_owenWilson_channel",
     "fun_batman_channel",
@@ -88,6 +87,7 @@ addon.defaults = {
     combat_overloadReminder_enabled  = false,
     combat_mulchReminder_enabled     = false,
     combat_repairReminder_enabled    = false,
+    combat_repairReminder_pct        = 20,
     combat_readyCheck_enabled        = false,
     combat_diveReminder_enabled      = false,
 
@@ -104,6 +104,9 @@ addon.defaults = {
     general_autoKeystone         = false,
     general_skipQueueConfirm     = false,
     general_autoQuestAccept      = false,
+    general_autoQuest_skipTrivial = true,
+    general_autoFlightMap        = false,
+    general_thankBuffs           = false,
     general_autoQuestTurnIn      = false,
     general_autoGossipSelect     = false,
     general_ahCurrentExpansion   = false,
@@ -113,13 +116,57 @@ addon.defaults = {
     forever_bagSpace_enabled          = false,
     forever_bagSpace_threshold        = 4,
     forever_bagSpace_ignoreReagent    = false,
+    forever_bagsFull_enabled          = false,
+    forever_bagsFull_lowOnly          = false,
     forever_campfireReminder_enabled  = false,
     forever_rankUpgrade_enabled       = false,
     forever_plainsrunning_enabled     = false,
+    forever_reagents_enabled          = false,
+    forever_reagents_threshold        = 5,
+    -- Per reagent warn-below; 0 uses forever_reagents_threshold
+    forever_reagents_soulShard         = 0,
+    forever_reagents_arcanePowder      = 0,
+    forever_reagents_teleport          = 0,
+    forever_reagents_portal            = 0,
+    forever_reagents_candle            = 0,
+    forever_reagents_divinity          = 0,
+    forever_reagents_kings             = 0,
+    forever_reagents_wild              = 0,
+    forever_reagents_rebirth           = 0,
+    forever_reagents_ankh              = 0,
+    forever_reagents_flash             = 0,
+    forever_reagents_blinding          = 0,
+
+    -- Forever class buff reminders (Reminders > Buffs), all off by default
+    forever_buff_motw                 = false,
+    forever_buff_thorns               = false,
+    forever_buff_thorns_bearOnly      = true,
+    forever_buff_omen                 = false,
+    forever_buff_intellect            = false,
+    forever_buff_mageArmor            = false,
+    forever_buff_fortitude            = false,
+    forever_buff_innerFire            = false,
+    forever_buff_divineSpirit         = false,
+    forever_buff_shadowProt           = false,
+    forever_buff_righteousFury        = false,
+    forever_buff_righteousFury_shieldOnly = true,
+    forever_buff_blessing             = false,
+    forever_buff_demonArmor           = false,
+    forever_buff_lightningShield      = false,
+    forever_buff_weaponImbue          = false,
+    forever_buff_poisonMain           = false,
+    forever_buff_poisonOff            = false,
+    forever_buff_battleShout          = false,
+    forever_buff_trueshot             = false,
+    forever_buff_aspect               = false,
 
     -- UI > Gear
     ui_bagUpgrade_enabled         = false,
     ui_missingEnchant_enabled     = false,
+
+    -- UI > Quests
+    ui_questRewardCoin_enabled    = false,
+    ui_questXP_enabled            = false,
 
     -- UI > Mouse Ring
     ui_mouseRing_enabled          = false,
@@ -137,6 +184,7 @@ addon.defaults = {
     ui_hideEventToasts_enabled    = false,
     ui_hideZoneText_enabled       = false,
     ui_hideErrors_enabled         = false,
+    ui_hideErrors_keepImportant   = true,
 
     -- UI > Dragonriding
     ui_dragonriding_enabled       = false,
@@ -155,15 +203,34 @@ addon.defaults = {
     -- UI > Chat Copy
     ui_chatCopy_enabled           = false,
 
+    -- Settings panel accent: teal, red or gold
+    settings_accent               = "teal",
+
     -- UI > Minimap Button
     ui_minimapButton_enabled      = true,
     ui_minimapButton_angle        = 220,
 
     settings_panel_scale          = 1.0,
+    settings_debugAllClasses      = false,
+    ui_welcomeShown               = false,
 }
 
 local NUMBER_RULES = {
     forever_bagSpace_threshold        = { min = 1,  max = 20 },
+    combat_repairReminder_pct         = { min = 5,  max = 90 },
+    forever_reagents_threshold        = { min = 1,  max = 20 },
+    forever_reagents_soulShard         = { min = 0,  max = 20 },
+    forever_reagents_arcanePowder      = { min = 0,  max = 20 },
+    forever_reagents_teleport          = { min = 0,  max = 20 },
+    forever_reagents_portal            = { min = 0,  max = 20 },
+    forever_reagents_candle            = { min = 0,  max = 20 },
+    forever_reagents_divinity          = { min = 0,  max = 20 },
+    forever_reagents_kings             = { min = 0,  max = 20 },
+    forever_reagents_wild              = { min = 0,  max = 20 },
+    forever_reagents_rebirth           = { min = 0,  max = 20 },
+    forever_reagents_ankh              = { min = 0,  max = 20 },
+    forever_reagents_flash             = { min = 0,  max = 20 },
+    forever_reagents_blinding          = { min = 0,  max = 20 },
     ui_mouseRing_size             = { min = 20,    max = 100 },
     ui_dragonriding_barWidth      = { min = 8,     max = 200 },
     ui_dragonriding_speedHeight   = { min = 4,     max = 100 },
@@ -237,8 +304,8 @@ local function runMigrations(db)
         db.dbVersion = CURRENT_DB_VERSION
     end
 
-    -- Enforce removals even if a beta build stamped the current version before
-    -- completing cleanup. Preserve a future schema marker when downgrading.
+    -- Always clean up old keys, a beta build may have set the version early.
+    -- Don't lower the version if a newer build saved it.
     removeObsoleteKeys(db)
     if version <= CURRENT_DB_VERSION then
         db.dbVersion = CURRENT_DB_VERSION
@@ -270,8 +337,7 @@ local function validateDB(db, defaults)
         db[key] = clamp(value, rule.min, rule.max)
     end
 
-    -- Optional state used to restore the camera CVar when the feature is
-    -- disabled. It is deliberately absent until a value has been captured.
+    -- Camera distance from before the feature was turned on, nil until saved.
     local previous = db.general_maxCameraDistance_previous
     if previous ~= nil then
         if isFiniteNumber(previous) then
@@ -281,13 +347,12 @@ local function validateDB(db, defaults)
         end
     end
     if db.general_maxCameraDistance and db.general_maxCameraDistance_previous == nil then
-        -- Legacy releases forced 2.6 without recording the value they replaced.
+        -- Old versions set 2.6 without saving what it was before.
         db.general_maxCameraDistance_previous = 1.9
     end
 end
 
--- Initialize and validate the account-wide SavedVariables-backed DB.
--- Called from ADDON_LOADED in MysteriousQoL.lua.
+-- Sets up and checks the saved settings. Runs on ADDON_LOADED.
 function addon:MI_InitDB()
     if type(MysteriousQoLDB) ~= "table" then
         MysteriousQoLDB = {}
@@ -297,7 +362,7 @@ function addon:MI_InitDB()
     self.db = MysteriousQoLDB
 end
 
--- Shared factory for bouncing reminder frames used by multiple Reminders/ modules.
+-- Bouncing text used by the reminders.
 -- opts: { baseY, bounce, speed, fontSize, color, shadow, width, height, strata, text, icon, iconSize }
 function addon.MI_CreateBouncingReminder(name, opts)
     opts = opts or {}

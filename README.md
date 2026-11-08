@@ -1,6 +1,6 @@
 # MysteriousQoL
 
-MysteriousQoL is a personal World of Warcraft Retail add-on with independently toggleable quality-of-life features.
+MysteriousQoL is a personal World of Warcraft add-on with independently toggleable quality-of-life features. Works on Retail and WoW: Forever. Forever gets its own set of features, listed below.
 
 ## Getting Started
 
@@ -67,9 +67,21 @@ All addon sounds use one shared configurable audio channel (Master, SFX, Music, 
 - **Batman Teleport Sound** - plays the Batman theme when you zone in via hearthstone, mage portal, or toy.
 - **Blink Sound** - plays a DBZ sound on Blink/Shimmer (Mage) or Shift (Demon Hunter).
 - **Bloodlust Sound** - plays a sound when Bloodlust/Heroism/Time Warp or equivalent is applied while you are inside an instance. Sound choice configurable (R2-D2 or Wei).
+- **MystGems** - a match-3 gem game. Type `/mqol gems` to play. Also opens on flight paths with a bar showing time left on routes you've flown before.
 - **Owen Wilson Loot Sounds** - plays a random Owen Wilson "wow" clip when a loot window opens.
 - **Roll Sound** - plays a random sound on Roll or Chi Torpedo (Monk).
 - **Stealth Sound** - plays a sound on Stealth (Rogue) or Prowl (Druid).
 - **Vendor Sound** - plays a money sound when grey items are sold.
 - **Victory Sound** - optional achievement victory sound for a small set of achievements earned inside instances; disabled by default.
 - **Zoomies Sound** - plays a sound on major speed abilities: Aspect of the Cheetah, Dash, Divine Steed, Burning Rush. Individual spells toggleable.
+
+## WoW: Forever
+
+Forever-only features, all off by default:
+- **Bag Space Warning** - warns when you loot with only a few bag slots left. Can ignore the reagent bag.
+- **Campfire Reminder** - reminds you to rest at a nearby campfire while levelling.
+- **Max Plainsrunning Sound** - plays music when Plainsrunning (Tauren) reaches 30 stacks.
+- **Seal Reminder** - warns paladins in combat when no seal is active.
+- **Upgrade Spell Ranks on Bars** - learning a new rank replaces lower ranks of that spell on your action bars.
+
+Not available on Forever: Blink, Stealth, Roll, Zoomies, Bloodlust and Victory sounds, Skyriding Vigor Tracker, Auto-Slot Keystone, Skip Queue Confirm, AH filter, Ready Check Preflight, Missing Enchant Highlights, and most reminders (Mail and Repair still work).

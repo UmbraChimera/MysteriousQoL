@@ -1,7 +1,7 @@
 local _, addon = ...
 
--- Personal-only ready-check preflight. This never changes the native ready
--- check response and deliberately does not inspect or report on other players.
+-- On a ready check, tells you what you're missing. Only checks you, and
+-- doesn't answer the ready check for you.
 local DURABILITY_THRESHOLD = 0.75
 local SOULSTONE_SPELL_ID = 20707
 local HEALTHSTONE_ITEM_IDS = {
@@ -10,9 +10,8 @@ local HEALTHSTONE_ITEM_IDS = {
     [224464] = true, -- Demonic Healthstone (Midnight)
 }
 
--- Midnight Season 1 flask aura spell IDs. Food buffs share the "Well Fed"
--- aura name, so that check is intentionally name-based until Blizzard exposes
--- a stable food category API.
+-- Midnight Season 1 flasks. Food is checked by the "Well Fed" name instead,
+-- there's no good way to tell food buffs apart by ID.
 local FLASK_AURAS = {
     [1235108] = true, -- Flask of the Magisters
     [1235110] = true, -- Flask of the Blood Knights
@@ -230,7 +229,7 @@ end
 local eventFrame = CreateFrame("Frame")
 eventFrame:SetScript("OnEvent", function(_, event)
     if event == "READY_CHECK" then
-        -- Let the game finish updating transient aura/inventory state first.
+        -- Wait a frame for buffs and bags to catch up
         C_Timer.After(0, showPreflight)
     end
 end)

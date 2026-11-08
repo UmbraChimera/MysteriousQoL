@@ -1,13 +1,11 @@
 local _, addon = ...
 
--- Plays a .ogg sound when a Bloodlust-type haste effect is applied to the player.
--- Detects via the Sated-family debuffs; the buff itself became a private aura in 11.1.
--- Add debuff spell IDs to MI_LUST_IDS to extend coverage.
+-- Plays a sound when you get Bloodlust or similar. Looks for the Sated
+-- debuffs, since the lust buff itself has been a private aura since 11.1.
 
 local SOUND_DIR = "Interface\\AddOns\\MysteriousQoL\\Sounds\\Lust\\"
 
--- Sated-type debuffs applied alongside each Bloodlust equivalent.
--- These remain publicly readable via C_UnitAuras despite the private aura changes.
+-- These are still readable
 local MI_LUST_IDS = {
     [57724]  = true,  -- Sated                 (Bloodlust)
     [264689] = true,  -- Fatigued              (Primal Rage)
@@ -29,18 +27,10 @@ local function isLustActive()
 end
 
 local f = CreateFrame("Frame")
-f:RegisterUnitEvent("UNIT_AURA", "player")
-f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", function(_, event)
-    -- Zone-in seeds the rising-edge detector so the sound never fires from the
-    -- aura-refresh that fires on PLAYER_ENTERING_WORLD with Sated already active.
+    -- If Sated is already up when you zone in, don't play it again.
     if event == "PLAYER_ENTERING_WORLD" then
         played = isLustActive()
-        return
-    end
-
-    if not addon.db.fun_bloodlust_enabled then
-        played = false
         return
     end
 
@@ -58,3 +48,14 @@ f:SetScript("OnEvent", function(_, event)
         played = false
     end
 end)
+
+function addon.MI_Bloodlust_SetEnabled()
+    if addon.db.fun_bloodlust_enabled then
+        played = isLustActive()
+        f:RegisterUnitEvent("UNIT_AURA", "player")
+        f:RegisterEvent("PLAYER_ENTERING_WORLD")
+    else
+        f:UnregisterAllEvents()
+        played = false
+    end
+end

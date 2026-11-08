@@ -92,33 +92,43 @@ local function BuildButton()
     button:SetFrameLevel(8)
     button:SetClampedToScreen(true)
 
+    -- Layout matches the current UI's tracking border: a 50x50 ring texture
+    -- anchored top left, with its hole centered 1px above the button's center.
+    -- The old 53x53 size put the ring 1.5px right of and below the icon.
+
     -- Background (circular minimap disc)
     local bg = button:CreateTexture(nil, "BACKGROUND")
     bg:SetSize(24, 24)
-    bg:SetPoint("CENTER")
+    bg:SetPoint("CENTER", 0, 1)
     bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
 
-    -- Icon (centered, sized to sit inside the border ring)
+    -- Icon, cut to a circle so its square corners stay inside the ring.
     -- Auto-swaps to pride icon during June.
     local icon = button:CreateTexture(nil, "ARTWORK")
     icon:SetSize(18, 18)
-    icon:SetPoint("CENTER")
+    icon:SetPoint("CENTER", 0, 1)
     local iconPath = (date("*t").month == 6)
-        and "Interface\\AddOns\\MysteriousQoL\\MysteriousQoLPride"
-        or  "Interface\\AddOns\\MysteriousQoL\\MysteriousQoL"
+        and "Interface\\AddOns\\" .. addonName .. "\\MysteriousQoLPride"
+        or  "Interface\\AddOns\\" .. addonName .. "\\MysteriousQoL"
     icon:SetTexture(iconPath)
+    local mask = button:CreateMaskTexture()
+    mask:SetTexture("Interface\\AddOns\\" .. addonName .. "\\Assets\\UI\\CircleMask",
+        "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    mask:SetAllPoints(icon)
+    icon:AddMaskTexture(mask)
 
-    -- Border (TOPLEFT-anchored; the ring sits in the upper-left of the 53x53 texture)
+    -- Border ring
     local border = button:CreateTexture(nil, "OVERLAY")
-    border:SetSize(53, 53)
+    border:SetSize(50, 50)
     border:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 
     -- Highlight
     local highlight = button:CreateTexture(nil, "HIGHLIGHT")
     highlight:SetSize(18, 18)
-    highlight:SetPoint("CENTER")
+    highlight:SetPoint("CENTER", 0, 1)
     highlight:SetColorTexture(1, 1, 1, 0.15)
+    highlight:AddMaskTexture(mask)
 
     -- Tooltip
     button:SetScript("OnEnter", function(self)
