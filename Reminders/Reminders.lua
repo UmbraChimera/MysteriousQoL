@@ -106,6 +106,7 @@ local function RegisterReminderEvents()
         pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
     end
     eventFrame:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
+    eventFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
     eventFrame:SetScript("OnEvent", function()
         updateRemindersThrottled()
     end)

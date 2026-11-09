@@ -3,6 +3,9 @@ local _, addon = ...
 -- WoW add-ons cannot read packaged Markdown files at runtime. Keep this compact
 -- in-game summary aligned with CHANGELOG.md instead of duplicating every detail.
 local RELEASE_NOTES = [[
+|cff20d5e8Version 1.5.2|r
+Made Repair Reminder less noisy.
+
 |cff20d5e8Version 1.5.1|r
 Bug fixes.
 

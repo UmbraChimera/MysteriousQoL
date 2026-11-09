@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.2
+- Made Repair Reminder less noisy
+
 ## 1.5.1
 - Bug fixes
 

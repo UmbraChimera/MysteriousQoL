@@ -1,11 +1,13 @@
 local _, addon = ...
 
 -- Repair Reminder: when any equipped item drops to the set durability, plays a
--- sound and prints a chat line once, and shows "Fix your shit!" while out of
--- combat. Re-arms once gear is back above the setting (repaired).
+-- sound and prints a chat line once, and shows "Fix your shit!" while resting
+-- or for a few seconds after you come back to life. Re-arms once gear is back
+-- above the setting (repaired).
 
 local PREFIX = "|cff00ccff[MysteriousQoL]|r "
 local REARM_MARGIN = 0.05
+local REZ_SHOW_TIME = 6
 
 -- Lowest durability of any equipped item, 0..1, or nil with nothing that wears.
 local function lowestDurability()
@@ -34,11 +36,23 @@ local repairFrame = addon.MI_CreateBouncingReminder("MysteriousQoL_RepairReminde
 })
 
 local warned = false
+local rezUntil = 0
 
 local function hideFrame()
     repairFrame.ResetBounce()
     repairFrame:Hide()
 end
+
+-- PLAYER_ALIVE also fires when you release to a ghost, so check you're actually up
+local rezFrame = CreateFrame("Frame")
+rezFrame:RegisterEvent("PLAYER_ALIVE")
+rezFrame:RegisterEvent("PLAYER_UNGHOST")
+rezFrame:SetScript("OnEvent", function()
+    if UnitIsDeadOrGhost("player") then return end
+    rezUntil = GetTime() + REZ_SHOW_TIME
+    addon.MI_RepairReminder_Update()
+    C_Timer.After(REZ_SHOW_TIME + 0.1, addon.MI_RepairReminder_Update)
+end)
 
 function addon.MI_RepairReminder_Update()
     if not addon.db.combat_repairReminder_enabled then
@@ -61,7 +75,8 @@ function addon.MI_RepairReminder_Update()
         PlaySound(SOUNDKIT.RAID_WARNING, addon.db.sound_channel)
     end
 
-    if UnitAffectingCombat("player") then
+    local justRezzed = GetTime() < rezUntil
+    if UnitAffectingCombat("player") or not (IsResting() or justRezzed) then
         hideFrame()
     else
         repairFrame:Show()

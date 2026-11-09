@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: MysteriousQoL
 ## Notes: Mysterious quality of life improvements
-## Version: 1.5.1
+## Version: 1.5.2
 ## SavedVariables: MysteriousQoLDB
 ## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
 

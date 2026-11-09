@@ -325,7 +325,7 @@ frame:SetScript("OnEvent", function(self, _, name)
             "Plays a sound on login if you have unread mail. Only triggers on initial login, not reloads.",
             addon.MI_MailReminder_SetEnabled)
         UI.Checkbox("combat_repairReminder_enabled", "Repair Reminder",
-            "Warns when your gear drops to the set durability.",
+            "Warns when your gear drops to the set durability, shown while resting or right after you resurrect.",
             refreshReminders,
             {
                 { type = "slider", key = "combat_repairReminder_pct", label = "Warn At %",
