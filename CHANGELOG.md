@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.3
+- Hide Error Messages no longer hides camp errors
+
 ## 1.5.2
 - Made Repair Reminder less noisy
 
