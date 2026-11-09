@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.6
+- For Forever
+  - Flight map shows flight times
+  - MystGems flight bar now works on your first flight
+
+## 1.5.5
+- Spell reminder updates
+
 ## 1.5.4
 - Added a What's New popup that shows once after updating
 

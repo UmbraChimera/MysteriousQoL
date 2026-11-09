@@ -706,6 +706,51 @@ local function routeEnds(slot)
     return from, to
 end
 
+-- Seconds for a route: your own timing first, then the built-in table (Forever only).
+local function routeTime(fromID, toID)
+    local saved = flightTimes()[fromID .. ">" .. toID]
+    if saved then return saved end
+    local faction = addon.FLIGHT_TIMES and addon.FLIGHT_TIMES[UnitFactionGroup("player")]
+    return faction and faction[fromID] and faction[fromID][toID]
+end
+
+-- Flight map tooltips: add the flight time to the hovered destination.
+local function addTimeToTooltip(slot)
+    if not addon.db.fun_mystGems_enabled or not slot then return end
+    local from, to = routeEnds(slot)
+    if not (from and to) or from == to then return end
+    local seconds = routeTime(from.nodeID, to.nodeID)
+    if not seconds then return end
+    GameTooltip:AddLine(string.format("Flight time: %d:%02d", math.floor(seconds / 60), seconds % 60), 1, 1, 1)
+    GameTooltip:Show()
+end
+
+-- Hooks the old taxi window (button IDs are the slots) and the newer flight
+-- map's pins. Either can load later, so this retries as addons load.
+local hookedTaxi, hookedMap = false, false
+local function hookTooltips()
+    if not hookedTaxi and TaxiNodeOnButtonEnter then
+        hookedTaxi = true
+        hooksecurefunc("TaxiNodeOnButtonEnter", function(button)
+            addTimeToTooltip(button and button:GetID())
+        end)
+    end
+    if not hookedMap and FlightMap_FlightPointPinMixin then
+        hookedMap = true
+        hooksecurefunc(FlightMap_FlightPointPinMixin, "OnMouseEnter", function(pin)
+            addTimeToTooltip(pin.taxiNodeData and pin.taxiNodeData.slotIndex)
+        end)
+    end
+    return hookedTaxi and hookedMap
+end
+if not hookTooltips() then
+    local loader = CreateFrame("Frame")
+    loader:RegisterEvent("ADDON_LOADED")
+    loader:SetScript("OnEvent", function(self)
+        if hookTooltips() then self:UnregisterAllEvents() end
+    end)
+end
+
 -- Read-only: notes where the flight goes when a flight master route is picked.
 if TakeTaxiNode then
     hooksecurefunc("TakeTaxiNode", function(slot)
@@ -714,6 +759,7 @@ if TakeTaxiNode then
             pendingRoute = {
                 key = from.nodeID .. ">" .. to.nodeID,
                 dest = to.name,
+                length = routeTime(from.nodeID, to.nodeID),
             }
         elseif TaxiNodeName then
             -- No node IDs: fall back to the destination name so the route can still be timed.
@@ -735,7 +781,7 @@ local function onFlightCheck()
                 key = route.key,
                 dest = route.dest,
                 start = GetTime(),
-                length = route.key and flightTimes()[route.key],
+                length = route.length or (route.key and flightTimes()[route.key]),
             }
         end
         if addon.db.fun_mystGems_flight and not (frame and frame:IsShown()) and not InCombatLockdown() then

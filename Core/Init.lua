@@ -141,7 +141,6 @@ addon.defaults = {
     forever_buff_motw                 = false,
     forever_buff_thorns               = false,
     forever_buff_thorns_bearOnly      = true,
-    forever_buff_omen                 = false,
     forever_buff_intellect            = false,
     forever_buff_mageArmor            = false,
     forever_buff_fortitude            = false,

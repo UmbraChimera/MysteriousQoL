@@ -17,7 +17,6 @@ local BUFFS = {
         { key = "forever_buff_motw", label = "Mark of the Wild", spells = { 1126 }, also = { 21849 } },
         { key = "forever_buff_thorns", label = "Thorns", spells = { 467 },
           bearOnlyKey = "forever_buff_thorns_bearOnly" },
-        { key = "forever_buff_omen", label = "Omen of Clarity", spells = { 16864 } },
     },
     MAGE = {
         { key = "forever_buff_intellect", label = "Arcane Intellect", spells = { 1459 }, also = { 23028 } },
@@ -55,7 +54,8 @@ local BUFFS = {
     },
     HUNTER = {
         { key = "forever_buff_trueshot", label = "Trueshot Aura", spells = { 19506 } },
-        { key = "forever_buff_aspect", label = "Aspect", spells = { 13165, 13163, 5118 } },
+        -- Hawk, Monkey, Cheetah, Beast, Wild
+        { key = "forever_buff_aspect", label = "Aspect", spells = { 13165, 13163, 5118, 13161, 20043 } },
     },
 }
 

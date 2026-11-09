@@ -4,6 +4,8 @@ local _, addon = ...
 -- in-game summary aligned with CHANGELOG.md instead of duplicating every detail.
 -- Newest first. The What's New popup shows the ones newer than you last saw.
 addon.RELEASE_NOTES = {
+    { version = "1.5.6", text = "Forever: flight map shows flight times, and the MystGems flight bar works on your first flight." },
+    { version = "1.5.5", text = "Spell reminder updates." },
     { version = "1.5.4", text = "Added a What's New popup that shows once after updating." },
     { version = "1.5.3", text = "Hide Error Messages no longer hides camp errors." },
     { version = "1.5.2", text = "Made Repair Reminder less noisy." },

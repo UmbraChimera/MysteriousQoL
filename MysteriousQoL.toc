@@ -1,7 +1,7 @@
 ## Interface: 120001, 120007, 120100
 ## Title: MysteriousQoL
 ## Notes: Mysterious quality of life improvements
-## Version: 1.5.4
+## Version: 1.5.6
 ## SavedVariables: MysteriousQoLDB
 ## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
 
