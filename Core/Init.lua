@@ -213,6 +213,7 @@ addon.defaults = {
     settings_panel_scale          = 1.0,
     settings_debugAllClasses      = false,
     ui_welcomeShown               = false,
+    ui_lastSeenVersion            = "",
 }
 
 local NUMBER_RULES = {

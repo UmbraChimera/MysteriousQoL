@@ -2,7 +2,8 @@ local addonName, addon = ...
 
 -- Welcome popup (once per account) and a step-by-step setup helper that
 -- offers a few popular options per section. /mqol setup reopens the helper.
--- Both use the settings panel's look (addon.customUI.Style).
+-- Also a What's New popup once after each update. All use the settings
+-- panel's look (addon.customUI.Style).
 
 local LOGO = "Interface\\AddOns\\" .. addonName .. "\\MysteriousQoL"
 local ROW_H = 30
@@ -303,14 +304,96 @@ function addon.MI_Welcome_Show()
     welcome:Show()
 end
 
--- Once per account, a few seconds after the first login with this version.
+-- What's New popup, once after each update
+
+local whatsNew
+
+-- "1.5.3" -> { 1, 5, 3 }
+local function versionParts(v)
+    local parts = {}
+    for n in tostring(v):gmatch("%d+") do parts[#parts + 1] = tonumber(n) end
+    return parts
+end
+
+local function isNewer(a, b)
+    local pa, pb = versionParts(a), versionParts(b)
+    for i = 1, math.max(#pa, #pb) do
+        local x, y = pa[i] or 0, pb[i] or 0
+        if x ~= y then return x > y end
+    end
+    return false
+end
+
+-- Notes newer than the last version seen. If we don't know it, just this one.
+local function newNotes(lastSeen, current)
+    local list = {}
+    for _, note in ipairs(addon.RELEASE_NOTES or {}) do
+        if note.version then
+            if lastSeen == "" then
+                if note.version == current then list[#list + 1] = note end
+            elseif isNewer(note.version, lastSeen) and not isNewer(note.version, current) then
+                list[#list + 1] = note
+            end
+        end
+    end
+    return list
+end
+
+local function createWhatsNew()
+    whatsNew = makeWindow("MysteriousQoL_WhatsNew", 420)
+    whatsNew.title:SetText("What's new in MysteriousQoL")
+
+    whatsNew.text = S.Text(whatsNew.body, 13, S.Colors.text)
+    whatsNew.text:SetPoint("TOPLEFT", 0, 0)
+    whatsNew.text:SetWidth(420 - 28)
+    whatsNew.text:SetJustifyH("LEFT")
+    whatsNew.text:SetWordWrap(true)
+
+    local done = S.Button(whatsNew, "Got it", 80, 24)
+    done:SetPoint("BOTTOMRIGHT", -14, 12)
+    done:SetScript("OnClick", function() whatsNew:Hide() end)
+    local full = S.Button(whatsNew, "Full changelog", 110, 24)
+    full:SetPoint("RIGHT", done, "LEFT", -8, 0)
+    full:SetScript("OnClick", function()
+        whatsNew:Hide()
+        if addon.MI_Changelog_Toggle then addon.MI_Changelog_Toggle() end
+    end)
+end
+
+local function showWhatsNew(notes, current)
+    S = S or addon.customUI.Style
+    if not whatsNew then createWhatsNew() end
+    whatsNew.sub:SetText("Updated to version " .. current)
+    local hex = CreateColor(unpack(S.Accent().accent)):GenerateHexColor()
+    local parts = {}
+    for _, note in ipairs(notes) do
+        parts[#parts + 1] = "|c" .. hex .. "Version " .. note.version .. "|r\n" .. note.text
+    end
+    whatsNew.text:SetText(table.concat(parts, "\n\n"))
+    whatsNew:SetHeight(68 + whatsNew.text:GetStringHeight() + 56)
+    whatsNew:Show()
+end
+
+-- A few seconds after login: the welcome popup once per account, otherwise
+-- What's New once per update.
 local loginFrame = CreateFrame("Frame")
 loginFrame:RegisterEvent("PLAYER_LOGIN")
 loginFrame:SetScript("OnEvent", function()
-    if not addon.db or addon.db.ui_welcomeShown then return end
+    if not addon.db then return end
+    local current = C_AddOns.GetAddOnMetadata(addonName, "Version")
+    if not current then return end
     C_Timer.After(4, function()
         if InCombatLockdown() then return end
-        addon.db.ui_welcomeShown = true
-        addon.MI_Welcome_Show()
+        local db = addon.db
+        if not db.ui_welcomeShown then
+            db.ui_welcomeShown = true
+            db.ui_lastSeenVersion = current
+            addon.MI_Welcome_Show()
+            return
+        end
+        if db.ui_lastSeenVersion == current then return end
+        local notes = newNotes(db.ui_lastSeenVersion, current)
+        db.ui_lastSeenVersion = current
+        if #notes > 0 then showWhatsNew(notes, current) end
     end)
 end)

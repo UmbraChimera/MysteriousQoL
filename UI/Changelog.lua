@@ -2,46 +2,32 @@ local _, addon = ...
 
 -- WoW add-ons cannot read packaged Markdown files at runtime. Keep this compact
 -- in-game summary aligned with CHANGELOG.md instead of duplicating every detail.
-local RELEASE_NOTES = [[
-|cff20d5e8Version 1.5.3|r
-Hide Error Messages no longer hides camp errors.
+-- Newest first. The What's New popup shows the ones newer than you last saw.
+addon.RELEASE_NOTES = {
+    { version = "1.5.4", text = "Added a What's New popup that shows once after updating." },
+    { version = "1.5.3", text = "Hide Error Messages no longer hides camp errors." },
+    { version = "1.5.2", text = "Made Repair Reminder less noisy." },
+    { version = "1.5.1", text = "Bug fixes." },
+    { version = "1.5.0", text = "Updated UI with a new settings panel and Guided Setup. Added class buff and reagent reminders and Bags Full Helper for Forever, Thank Buffers, Quest XP and more." },
+    { version = "1.4.5", text = "Added MystGems, a match-3 gem game (/mqol gems). Added Max Plainsrunning Sound for Forever." },
+    { version = "1.4.4", text = "Fixed a blocked action error when eating with Bag Upgrade Indicators on." },
+    { version = "1.4.3", text = "Fixed a blocked action error at the bank. Auto-Select Gossip skips bank and vendor options." },
+    { version = "1.4.2", text = "Added Upgrade Spell Ranks on Bars for Forever. Bag Space Warning can ignore the reagent bag." },
+    { version = "1.4.1", text = "Added WoW: Forever support." },
+    { version = "1.4.0", text = "Ready Check Preflight: personal gear and consumable checks, plus Healthstone and group Soulstone coverage when a Warlock is present." },
+    { version = "1.3.0", text = "Gear indicators, improved settings reliability, Victory Sound, UI/reminder fixes, and Guild Manager retirement." },
+    { version = "1.2.2", text = "No Pet Sound, Hide Error Messages, and Retail 12.0.7 / 12.1 support." },
+    { title = "Earlier releases", text = "Core QoL features: custom settings, skyriding tracker, combat reminders, vendor automation, and sound effects." },
+}
 
-|cff20d5e8Version 1.5.2|r
-Made Repair Reminder less noisy.
-
-|cff20d5e8Version 1.5.1|r
-Bug fixes.
-
-|cff20d5e8Version 1.5.0|r
-Updated UI with a new settings panel and Guided Setup. Added class buff and reagent reminders and Bags Full Helper for Forever, Thank Buffers, Quest XP and more.
-
-|cff20d5e8Version 1.4.5|r
-Added MystGems, a match-3 gem game (/mqol gems). Added Max Plainsrunning Sound for Forever.
-
-|cff20d5e8Version 1.4.4|r
-Fixed a blocked action error when eating with Bag Upgrade Indicators on.
-
-|cff20d5e8Version 1.4.3|r
-Fixed a blocked action error at the bank. Auto-Select Gossip skips bank and vendor options.
-
-|cff20d5e8Version 1.4.2|r
-Added Upgrade Spell Ranks on Bars for Forever. Bag Space Warning can ignore the reagent bag.
-
-|cff20d5e8Version 1.4.1|r
-Added WoW: Forever support.
-
-|cff20d5e8Version 1.4.0|r
-Ready Check Preflight: personal gear and consumable checks, plus Healthstone and group Soulstone coverage when a Warlock is present.
-
-|cff20d5e8Version 1.3.0|r
-Gear indicators, improved settings reliability, Victory Sound, UI/reminder fixes, and Guild Manager retirement.
-
-|cff20d5e8Version 1.2.2|r
-No Pet Sound, Hide Error Messages, and Retail 12.0.7 / 12.1 support.
-
-|cff20d5e8Earlier releases|r
-Core QoL features: custom settings, skyriding tracker, combat reminders, vendor automation, and sound effects.
-]]
+local function buildNotes()
+    local parts = {}
+    for _, note in ipairs(addon.RELEASE_NOTES) do
+        local head = note.version and ("Version " .. note.version) or note.title
+        parts[#parts + 1] = "|cff20d5e8" .. head .. "|r\n" .. note.text
+    end
+    return table.concat(parts, "\n\n")
+end
 
 local BAR_TEXTURE = [[Interface\Buttons\WHITE8x8]]
 local frame
@@ -106,7 +92,7 @@ local function createFrame()
     text:SetJustifyH("LEFT")
     text:SetJustifyV("TOP")
     text:SetTextColor(0.9, 0.92, 0.94, 1)
-    text:SetText(RELEASE_NOTES)
+    text:SetText(buildNotes())
     body:SetHeight(text:GetStringHeight() + 8)
     scroll:SetScrollChild(body)
 end

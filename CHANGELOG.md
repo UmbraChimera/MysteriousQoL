@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.4
+- Added a What's New popup that shows once after updating
+
 ## 1.5.3
 - Hide Error Messages no longer hides camp errors
 
