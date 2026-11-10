@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.7
+- Added Track Flight Times
+  - Shows a flight timer on the cast bar
+- Flights are no longer timed after a reload or relog mid-flight
+
 ## 1.5.6
 - For Forever
   - Flight map shows flight times

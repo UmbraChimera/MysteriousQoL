@@ -32,7 +32,7 @@ local selected, hintCell, lastSwap
 local busy = false
 local score, idle, clock = 0, 0, 0
 local openedByFlight = false
-local flight -- { key, dest, start, length } while on a flight path
+local flight -- { key, dest, start, length, noSave } while on a flight path
 
 -- Sound kit 888 is the level-up fanfare. Chain matches use the backpack coin click, or the
 -- loot coin sound if that kit is missing.
@@ -488,10 +488,12 @@ local function updateFlightBar()
         flightBar.text:SetText(string.format("%s  -  %s left", dest, formatTime(flight.length - elapsed)))
     else
         -- First time on this route: no time to count down yet, so it is timed instead.
+        -- After a reload or relog mid-flight it just shows how long since then.
         flightBar:SetMinMaxValues(0, 1)
         flightBar:SetValue(1)
         flightBar:SetAlpha(0.45 + 0.25 * math.sin(clock * 3))
-        flightBar.text:SetText(string.format("%s  -  timing this flight  %s", dest, formatTime(elapsed)))
+        local label = flight.noSave and "flying" or "timing this flight"
+        flightBar.text:SetText(string.format("%s  -  %s  %s", dest, label, formatTime(elapsed)))
     end
 end
 
@@ -687,6 +689,11 @@ end
 local flightFrame = CreateFrame("Frame")
 local pendingRoute
 
+-- Flights are tracked when MystGems (its own bar) or Track Flight Times (the cast bar) is on.
+local function tracking()
+    return addon.db.fun_mystGems_enabled or addon.db.general_flightTimes_enabled
+end
+
 local function flightTimes()
     if type(addon.db.fun_mystGems_flightTimes) ~= "table" then
         addon.db.fun_mystGems_flightTimes = {}
@@ -716,7 +723,7 @@ end
 
 -- Flight map tooltips: add the flight time to the hovered destination.
 local function addTimeToTooltip(slot)
-    if not addon.db.fun_mystGems_enabled or not slot then return end
+    if not tracking() or not slot then return end
     local from, to = routeEnds(slot)
     if not (from and to) or from == to then return end
     local seconds = routeTime(from.nodeID, to.nodeID)
@@ -771,20 +778,91 @@ if TakeTaxiNode then
     end)
 end
 
+-- Castbar-style timer for when the MystGems window is closed. Our own frame placed over the
+-- player cast bar; Blizzard's cast bar itself is never touched.
+local castBar
+
+local function setAtlasOr(texture, atlas, r, g, b, a)
+    if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
+        texture:SetAtlas(atlas)
+    else
+        texture:SetColorTexture(r, g, b, a)
+    end
+end
+
+local function createCastBar()
+    if castBar then return end
+    castBar = CreateFrame("StatusBar", nil, UIParent)
+    castBar:SetSize(208, 11)
+    castBar:SetFrameStrata("HIGH")
+    if PlayerCastingBarFrame then
+        castBar:SetPoint("CENTER", PlayerCastingBarFrame, "CENTER")
+    else
+        castBar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 180)
+    end
+    castBar:SetStatusBarTexture(BAR_TEXTURE)
+    setAtlasOr(castBar:GetStatusBarTexture(), "ui-castingbar-filling-standard", 1, 0.7, 0, 1)
+    local bg = castBar:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    setAtlasOr(bg, "ui-castingbar-background", 0, 0, 0, 0.5)
+    local border = castBar:CreateTexture(nil, "OVERLAY")
+    border:SetPoint("TOPLEFT", -2, 2)
+    border:SetPoint("BOTTOMRIGHT", 2, -2)
+    setAtlasOr(border, "ui-castingbar-frame", 0, 0, 0, 0)
+    castBar.text = castBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    castBar.text:SetPoint("TOP", castBar, "BOTTOM", 0, -2)
+    castBar.time = castBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    castBar.time:SetPoint("LEFT", castBar, "RIGHT", 6, 0)
+    castBar:Hide()
+end
+
+local function updateCastBar()
+    if not flight then
+        if castBar then castBar:Hide() end
+        flightFrame:SetScript("OnUpdate", nil)
+        return
+    end
+    local show = addon.db.general_flightTimes_enabled and not (frame and frame:IsShown())
+    if not show then
+        if castBar then castBar:Hide() end
+        return
+    end
+    createCastBar()
+    castBar:Show()
+    local elapsed = GetTime() - flight.start
+    castBar.text:SetText(flight.dest and flight.dest:match("^[^,]+") or "Flying")
+    if flight.length then
+        castBar:SetMinMaxValues(0, flight.length)
+        castBar:SetValue(math.min(elapsed, flight.length))
+        castBar:SetAlpha(1)
+        castBar.time:SetText(formatTime(flight.length - elapsed))
+    else
+        -- No known time for this route: full bar that pulses, counting up.
+        castBar:SetMinMaxValues(0, 1)
+        castBar:SetValue(1)
+        castBar:SetAlpha(0.6 + 0.3 * math.sin(GetTime() * 3))
+        castBar.time:SetText(formatTime(elapsed))
+    end
+end
+
 local function onFlightCheck()
-    if not addon.db.fun_mystGems_enabled then return end
+    if not tracking() then return end
     if UnitOnTaxi("player") then
         if not flight then
+            flightFrame:SetScript("OnUpdate", updateCastBar)
             local route = pendingRoute or {}
-            pendingRoute = nil
             flight = {
                 key = route.key,
                 dest = route.dest,
                 start = GetTime(),
                 length = route.length or (route.key and flightTimes()[route.key]),
+                -- No route picked means a reload or relog mid-flight: the time would be wrong.
+                noSave = not pendingRoute,
             }
+            pendingRoute = nil
         end
-        if addon.db.fun_mystGems_flight and not (frame and frame:IsShown()) and not InCombatLockdown() then
+        if addon.db.fun_mystGems_enabled and addon.db.fun_mystGems_flight
+            and not (frame and frame:IsShown()) and not InCombatLockdown() then
             createFrame()
             openedByFlight = true
             frame:Show()
@@ -792,7 +870,7 @@ local function onFlightCheck()
     else
         if flight then
             local took = GetTime() - flight.start
-            if flight.key and took > 10 then
+            if flight.key and not flight.noSave and took > 10 then
                 flightTimes()[flight.key] = math.floor(took + 0.5)
             end
             flight = nil
@@ -811,9 +889,9 @@ end)
 
 function addon.MI_MystGems_SetEnabled()
     flightFrame:UnregisterAllEvents()
-    if not addon.db.fun_mystGems_enabled then
+    if not addon.db.fun_mystGems_enabled and frame then frame:Hide() end
+    if not tracking() then
         flight = nil
-        if frame then frame:Hide() end
         return
     end
     -- Flights are always tracked so the bar works when the game is opened mid-flight.

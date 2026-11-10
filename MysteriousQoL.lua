@@ -103,6 +103,11 @@ frame:SetScript("OnEvent", function(self, _, name)
                 addon.MI_SpellRankUpgrade_SetEnabled)
         end
 
+        UI.Header("Travel")
+        UI.Checkbox("general_flightTimes_enabled", "Track Flight Times",
+            "Shows a flight path timer on the cast bar and flight times on flight map tooltips.",
+            addon.MI_MystGems_SetEnabled)
+
         UI.Header("Loot")
         UI.Checkbox("general_fasterLoot", "Faster Auto-Loot",
             "Rapidly loots all items from a corpse instead of waiting for the default loot animation.")

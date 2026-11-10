@@ -77,6 +77,7 @@ addon.defaults = {
     fun_mystGems_flight      = true,
     fun_mystGems_best        = 0,
     fun_mystGems_muted       = false,
+    general_flightTimes_enabled = true,
     -- Combat
     combat_buffReminder_enabled      = false,
     combat_sealReminder_enabled      = false,
