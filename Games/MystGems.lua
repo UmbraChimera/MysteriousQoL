@@ -845,11 +845,28 @@ local function updateCastBar()
     end
 end
 
-local function onFlightCheck()
+-- Flights started by talking to a flight master (Nighthaven), found by the area you're in.
+local function gossipRoute()
+    if not (addon.GOSSIP_FLIGHTS and C_Map and C_Map.GetAreaInfo) then return end
+    local here = GetMinimapZoneText()
+    for areaID, byFaction in pairs(addon.GOSSIP_FLIGHTS) do
+        local route = byFaction[UnitFactionGroup("player")]
+        if route and C_Map.GetAreaInfo(areaID) == here then
+            local key = "gossip:" .. areaID .. ">" .. route.dest
+            return { key = key, dest = route.dest, length = flightTimes()[key] or route.time }
+        end
+    end
+end
+
+local function onFlightCheck(event)
     if not tracking() then return end
     if UnitOnTaxi("player") then
         if not flight then
             flightFrame:SetScript("OnUpdate", updateCastBar)
+            -- Not after a login or reload: you'd be mid-flight and nowhere near the start.
+            if not pendingRoute and event ~= "PLAYER_ENTERING_WORLD" then
+                pendingRoute = gossipRoute()
+            end
             local route = pendingRoute or {}
             flight = {
                 key = route.key,
@@ -882,9 +899,9 @@ local function onFlightCheck()
     end
 end
 
-flightFrame:SetScript("OnEvent", function()
+flightFrame:SetScript("OnEvent", function(_, event)
     -- UnitOnTaxi turns true a moment after the flight starts.
-    C_Timer.After(1, onFlightCheck)
+    C_Timer.After(1, function() onFlightCheck(event) end)
 end)
 
 function addon.MI_MystGems_SetEnabled()

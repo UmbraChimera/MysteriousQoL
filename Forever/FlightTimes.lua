@@ -72,3 +72,12 @@ addon.FLIGHT_TIMES = {
 		[80] = { [22] = 250, [23] = 210, [25] = 69, [29] = 218, [30] = 252, [38] = 360, [40] = 345, [42] = 320, [44] = 236, [48] = 321, [53] = 366, [55] = 231, [58] = 299, [61] = 231, [72] = 450, [77] = 158, [79] = 452 },
 	},
 }
+
+-- Flights started by talking to a flight master instead of the flight map: area ID of where
+-- they start -> faction -> destination and seconds.
+addon.GOSSIP_FLIGHTS = {
+	[2361] = { -- Nighthaven, the druid flight master
+		Horde = { dest = "Thunder Bluff", time = 529 },
+		Alliance = { dest = "Rut'theran Village", time = 152 },
+	},
+}
