@@ -105,15 +105,20 @@ frame:SetScript("OnEvent", function(self, _, name)
                 { type = "slider", key = "forever_autoTracking_delay", label = "Seconds Between Switches",
                   min = 2, max = 60, step = 1, onChange = addon.MI_AutoTracking_SetEnabled },
             }
-            for _, t in ipairs(addon.MI_AutoTracking_List(showAllClasses())) do
+            local trackers = addon.MI_AutoTracking_List(showAllClasses())
+            for _, t in ipairs(trackers) do
                 local who = t.class and (t.class:sub(1, 1) .. t.class:sub(2):lower()) or t.race
                 trackingOptions[#trackingOptions + 1] = { type = "checkbox", key = t.key,
-                    label = t.name .. classTag(who),
+                    label = t.name .. classTag(who)
+                        .. (t.unlockedFrom and (" |cff888888(Temporarily unlocked from " .. t.unlockedFrom .. " at camp)|r") or ""),
                     tooltip = t.alongside and "Stays on alongside the others." or nil }
             end
-            UI.Checkbox("forever_autoTracking_enabled", "Auto Tracking",
-                "Switches between the trackers you tick while you're out of combat.",
-                addon.MI_AutoTracking_SetEnabled, trackingOptions)
+            -- Only for characters with a tracking spell.
+            if #trackers > 0 then
+                UI.Checkbox("forever_autoTracking_enabled", "Auto Tracking",
+                    "Switches between the trackers you tick while you're out of combat.",
+                    addon.MI_AutoTracking_SetEnabled, trackingOptions)
+            end
         end
 
         UI.Header("Travel")

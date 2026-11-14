@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.10
+- For Forever
+  - Auto Tracking only lists trackers you know
+  - Track Beasts from the Field Guide camp item can be picked on any character
+
 ## 1.5.9
 - For Forever
   - Added Auto Tracking: switches between Find Herbs, Find Minerals and any other trackers you pick

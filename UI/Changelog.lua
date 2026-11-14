@@ -4,6 +4,7 @@ local _, addon = ...
 -- in-game summary aligned with CHANGELOG.md instead of duplicating every detail.
 -- Newest first. The What's New popup shows the ones newer than you last saw.
 addon.RELEASE_NOTES = {
+    { version = "1.5.10", text = "Forever: Auto Tracking only lists trackers you know, plus Track Beasts from the Field Guide camp item." },
     { version = "1.5.9", text = "Forever: added Auto Tracking, and Nighthaven druid flights show time left." },
     { version = "1.5.8", text = "Forever: added Well-Rested Reminder." },
     { version = "1.5.7", text = "Added Track Flight Times, a flight timer on the cast bar. Flights are no longer timed after a reload mid-flight." },

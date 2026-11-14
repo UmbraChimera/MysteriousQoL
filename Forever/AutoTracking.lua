@@ -4,15 +4,15 @@ local _, addon = ...
 -- show on the minimap. With only one ticked or known, keeps that one on (also after dying).
 -- Forever only.
 
--- Every tracker that can be ticked. class/race limit who sees it in the settings.
+-- Every tracker that can be ticked. class/race only tag it in the all-classes debug view.
 -- alongside: stays on next to the others instead of taking turns.
 local TRACKERS = {
     { key = "forever_autoTracking_herbs",      id = 2383,  name = "Find Herbs" },
     { key = "forever_autoTracking_minerals",   id = 2580,  name = "Find Minerals" },
     { key = "forever_autoTracking_fish",       id = 43308, name = "Find Fish" },
     { key = "forever_autoTracking_treasure",   id = 2481,  name = "Find Treasure", race = "Dwarf", alongside = true },
-    -- Not only hunters: the Field Guide camp item gives Track Beasts at camp.
-    { key = "forever_autoTracking_beasts",     id = 1494,  name = "Track Beasts" },
+    -- camp: the camp item that also gives it at camp, to anyone.
+    { key = "forever_autoTracking_beasts",     id = 1494,  name = "Track Beasts", camp = "Field Guide" },
     { key = "forever_autoTracking_humanoids",  id = 19883, name = "Track Humanoids", class = "HUNTER" },
     { key = "forever_autoTracking_undead",     id = 19884, name = "Track Undead", class = "HUNTER" },
     { key = "forever_autoTracking_hidden",     id = 19885, name = "Track Hidden", class = "HUNTER" },
@@ -24,8 +24,16 @@ local TRACKERS = {
     { key = "forever_autoTracking_senseUndead", id = 5502, name = "Sense Undead", class = "PALADIN" },
     { key = "forever_autoTracking_senseDemons", id = 5500, name = "Sense Demons", class = "WARLOCK" },
 }
-local BY_ID = {}
-for _, t in ipairs(TRACKERS) do BY_ID[t.id] = t end
+local BY_ID, BY_NAME = {}, {}
+for _, t in ipairs(TRACKERS) do
+    BY_ID[t.id] = t
+    -- A camp's version may come with its own spell ID, so those are also found by name.
+    if t.camp then BY_NAME[t.name] = t end
+end
+
+local function trackerFor(info)
+    return info and (BY_ID[info.spellID] or BY_NAME[info.name])
+end
 
 local CAT_FORM = 1
 local GCD = 61304
@@ -34,14 +42,22 @@ local ticker
 local mutedSFX = false
 local owned -- spell ID this module last turned on
 
--- The trackers the settings show for this character (or every one).
+-- The trackers the settings show: the ones this character knows (or every one).
+-- Camp trackers are always shown, since they're hard to tick only while at camp.
+-- unlockedFrom is set on one you only get from a camp item.
 function addon.MI_AutoTracking_List(all)
-    local class = select(2, UnitClass("player"))
-    local race = select(2, UnitRace("player"))
+    local inMenu = {}
+    for i = 1, C_Minimap.GetNumTrackingTypes() do
+        local t = trackerFor(C_Minimap.GetTrackingInfo(i))
+        if t then inMenu[t] = true end
+    end
     local out = {}
     for _, t in ipairs(TRACKERS) do
-        if all or ((not t.class or t.class == class) and (not t.race or t.race == race)) then
-            out[#out + 1] = t
+        local known = IsPlayerSpell(t.id)
+        if all or known or inMenu[t] or t.camp then
+            local entry = setmetatable({}, { __index = t })
+            if not known and (t.camp or inMenu[t]) then entry.unlockedFrom = t.camp or "a camp item" end
+            out[#out + 1] = entry
         end
     end
     return out
@@ -58,9 +74,9 @@ local function scan()
     local rotation, alongside, otherOn = {}, {}, false
     for i = 1, C_Minimap.GetNumTrackingTypes() do
         local info = C_Minimap.GetTrackingInfo(i)
-        local t = info and BY_ID[info.spellID]
+        local t = trackerFor(info)
         if t and addon.db[t.key] and usable(t) then
-            local e = { index = i, id = t.id, active = info.active }
+            local e = { index = i, id = info.spellID, active = info.active }
             if t.alongside then
                 alongside[#alongside + 1] = e
             else
