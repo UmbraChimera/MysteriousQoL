@@ -101,6 +101,19 @@ frame:SetScript("OnEvent", function(self, _, name)
             UI.Checkbox("forever_rankUpgrade_enabled", "Upgrade Spell Ranks on Bars",
                 "When you learn a new rank of a spell, replaces lower ranks of it on your action bars. A lower rank you place back afterwards is left alone until the next rank.",
                 addon.MI_SpellRankUpgrade_SetEnabled)
+            local trackingOptions = {
+                { type = "slider", key = "forever_autoTracking_delay", label = "Seconds Between Switches",
+                  min = 2, max = 60, step = 1, onChange = addon.MI_AutoTracking_SetEnabled },
+            }
+            for _, t in ipairs(addon.MI_AutoTracking_List(showAllClasses())) do
+                local who = t.class and (t.class:sub(1, 1) .. t.class:sub(2):lower()) or t.race
+                trackingOptions[#trackingOptions + 1] = { type = "checkbox", key = t.key,
+                    label = t.name .. classTag(who),
+                    tooltip = t.alongside and "Stays on alongside the others." or nil }
+            end
+            UI.Checkbox("forever_autoTracking_enabled", "Auto Tracking",
+                "Switches between the trackers you tick while you're out of combat.",
+                addon.MI_AutoTracking_SetEnabled, trackingOptions)
         end
 
         UI.Header("Travel")
@@ -436,6 +449,7 @@ frame:SetScript("OnEvent", function(self, _, name)
         addon.MI_BagsFull_SetEnabled()
         addon.MI_Reagents_SetEnabled()
         addon.MI_SpellRankUpgrade_SetEnabled()
+        addon.MI_AutoTracking_SetEnabled()
         addon.MI_Plainsrunning_SetEnabled()
     end
     addon.MI_Reminders_Init()

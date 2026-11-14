@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: MysteriousQoL
 ## Notes: Mysterious quality of life improvements
-## Version: 1.5.8
+## Version: 1.5.9
 ## SavedVariables: MysteriousQoLDB
 ## IconTexture: Interface\AddOns\MysteriousQoL\MysteriousQoL
 
@@ -49,6 +49,7 @@ Forever/BagsFullHelper.lua
 Forever/CampfireReminder.lua
 Forever/WellRestedReminder.lua
 Forever/SpellRankUpgrade.lua
+Forever/AutoTracking.lua
 Forever/Plainsrunning.lua
 Forever/ClassBuffs.lua
 Forever/ReagentReminder.lua

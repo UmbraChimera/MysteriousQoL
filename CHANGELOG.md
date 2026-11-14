@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.9
+- For Forever
+  - Added Auto Tracking: switches between Find Herbs, Find Minerals and any other trackers you pick
+  - Nighthaven druid flights now show time left
+
 ## 1.5.8
 - For Forever
   - Added Well-Rested Reminder
