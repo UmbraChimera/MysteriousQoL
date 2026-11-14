@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.8
+- For Forever
+  - Added Well-Rested Reminder
+
 ## 1.5.7
 - Added Track Flight Times
   - Shows a flight timer on the cast bar

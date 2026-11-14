@@ -38,8 +38,10 @@ if addon.FOREVER then
         end
     end
     table.insert(UPDATE_FUNCS, "MI_CampfireReminder_Update")
+    table.insert(UPDATE_FUNCS, "MI_WellRestedReminder_Update")
     table.insert(UPDATE_FUNCS, "MI_BuffReminder_Update")
     table.insert(ENABLE_KEYS, "forever_campfireReminder_enabled")
+    table.insert(ENABLE_KEYS, "forever_wellRestedReminder_enabled")
     table.insert(ENABLE_KEYS, "combat_sealReminder_enabled")
 end
 

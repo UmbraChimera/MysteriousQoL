@@ -325,6 +325,9 @@ frame:SetScript("OnEvent", function(self, _, name)
             UI.Checkbox("forever_campfireReminder_enabled", "Campfire Rest Reminder",
                 "Prompts you to rest at a nearby campfire while levelling. Shows when Campfire Nearby is active but you have not taken Camp Benefits yet. Hidden at 60, in combat, and while dead.",
                 refreshReminders)
+            UI.Checkbox("forever_wellRestedReminder_enabled", "Well-Rested Reminder",
+                "Tells you to get some sleep when you have no Well-Rested.",
+                refreshReminders)
         end
         UI.Checkbox("combat_mailReminder_enabled", "Mail Reminder",
             "Plays a sound on login if you have unread mail. Only triggers on initial login, not reloads.",

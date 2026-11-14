@@ -120,6 +120,7 @@ addon.defaults = {
     forever_bagsFull_enabled          = false,
     forever_bagsFull_lowOnly          = false,
     forever_campfireReminder_enabled  = false,
+    forever_wellRestedReminder_enabled = false,
     forever_rankUpgrade_enabled       = false,
     forever_plainsrunning_enabled     = false,
     forever_reagents_enabled          = false,
