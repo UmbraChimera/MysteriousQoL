@@ -177,6 +177,9 @@ addon.defaults = {
     forever_buff_battleShout          = false,
     forever_buff_trueshot             = false,
     forever_buff_aspect               = false,
+    forever_buffs_text                = false,
+    forever_buffs_sound               = false,
+    forever_buffs_soundChoice         = "questFailed",
 
     -- UI > Gear
     ui_bagUpgrade_enabled         = false,

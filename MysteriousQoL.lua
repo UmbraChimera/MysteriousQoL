@@ -318,6 +318,16 @@ frame:SetScript("OnEvent", function(self, _, name)
                     "Shows an icon when " .. buff.label .. " is missing, out of combat.",
                     refreshReminders, children)
             end
+            UI.Checkbox("forever_buffs_text", "Missing Buff Text",
+                "Shows bouncing \"<buff> missing\" text at the top of the screen.",
+                refreshReminders)
+            UI.Checkbox("forever_buffs_sound", "Missing Buff Sound",
+                "Plays a sound when a reminded buff falls off.",
+                refreshReminders, {
+                    { type = "dropdown", key = "forever_buffs_soundChoice", label = "Sound",
+                      options = addon.CLASS_BUFF_SOUNDS,
+                      onChange = function(value) addon.MI_ClassBuffs_PlaySound(value) end },
+                })
         end
 
         UI.Header("Upkeep")

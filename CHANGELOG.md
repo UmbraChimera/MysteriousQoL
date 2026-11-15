@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.11
+- For Forever
+  - Class buff reminder icons flash harder and have a red border
+  - Added Missing Buff Text: bouncing "<buff> missing" at the top of the screen
+  - Added Missing Buff Sound: Quest Failed or Raid Warning when a buff falls off
+
 ## 1.5.10
 - For Forever
   - Auto Tracking only lists trackers you know

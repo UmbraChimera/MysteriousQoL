@@ -195,14 +195,32 @@ local function missingBuffs()
                     if have[name] then found = true break end
                 end
             end
-            if not found then missing[#missing + 1] = iconFor(buff, known) end
+            if not found then
+                missing[#missing + 1] = { key = buff.key, label = buff.label, icon = iconFor(buff, known) }
+            end
         end
     end
     return missing
 end
 
--- A row of pulsing icons above the seal reminder.
-local ICON_SIZE, GAP = 40, 6
+-- Sound choices for the missing buff alert.
+addon.CLASS_BUFF_SOUNDS = {
+    { text = "Quest Failed", value = "questFailed" },
+    { text = "Raid Warning", value = "raidWarning" },
+}
+
+local SOUNDKITS = {
+    questFailed = SOUNDKIT and SOUNDKIT.IG_QUEST_FAILED or 847,
+    raidWarning = SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959,
+}
+
+function addon.MI_ClassBuffs_PlaySound(choice)
+    choice = choice or addon.db.forever_buffs_soundChoice
+    PlaySound(SOUNDKITS[choice] or SOUNDKITS.questFailed, addon.db.sound_channel or "SFX")
+end
+
+-- A row of flashing icons with red borders above the seal reminder.
+local ICON_SIZE, GAP, BORDER = 40, 6, 2
 local row = CreateFrame("Frame", "MysteriousQoL_ClassBuffsFrame", UIParent)
 row:SetSize(ICON_SIZE, ICON_SIZE)
 row:SetPoint("CENTER", UIParent, "CENTER", 0, 160)
@@ -213,23 +231,65 @@ local pulse = row:CreateAnimationGroup()
 pulse:SetLooping("BOUNCE")
 local fade = pulse:CreateAnimation("Alpha")
 fade:SetFromAlpha(1)
-fade:SetToAlpha(0.4)
-fade:SetDuration(0.6)
+fade:SetToAlpha(0.15)
+fade:SetDuration(0.35)
 
 local icons = {}
 local function icon(i)
     if not icons[i] then
-        local tex = row:CreateTexture(nil, "ARTWORK")
-        tex:SetSize(ICON_SIZE, ICON_SIZE)
+        local holder = CreateFrame("Frame", nil, row)
+        holder:SetSize(ICON_SIZE, ICON_SIZE)
+        local border = holder:CreateTexture(nil, "BACKGROUND")
+        border:SetColorTexture(1, 0, 0, 1)
+        border:SetPoint("TOPLEFT", -BORDER, BORDER)
+        border:SetPoint("BOTTOMRIGHT", BORDER, -BORDER)
+        local tex = holder:CreateTexture(nil, "ARTWORK")
+        tex:SetAllPoints()
         tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        icons[i] = tex
+        holder.tex = tex
+        icons[i] = holder
     end
     return icons[i]
 end
 
+-- "<buff> missing" bouncing near the top of the screen, one line per buff.
+local missingText = addon.MI_CreateBouncingReminder("MysteriousQoL_ClassBuffsText", {
+    baseY = 300, height = 140, fontSize = 24,
+})
+
+-- Keys missing at the last check where auras could be read, so the sound
+-- only plays when a buff newly drops (not on every combat or mount).
+local lastMissing
+
 function addon.MI_ClassBuffs_Update()
     local missing = addon.FOREVER and missingBuffs() or {}
-    for _, tex in ipairs(icons) do tex:Hide() end
+
+    if addon.FOREVER and not suppressed() and currentBuffs() then
+        local now = {}
+        local dropped = false
+        for _, entry in ipairs(missing) do
+            now[entry.key] = true
+            if lastMissing and not lastMissing[entry.key] then dropped = true end
+        end
+        if dropped and addon.db.forever_buffs_sound then
+            addon.MI_ClassBuffs_PlaySound()
+        end
+        lastMissing = now
+    end
+
+    if #missing > 0 and addon.db.forever_buffs_text then
+        local lines = {}
+        for i, entry in ipairs(missing) do lines[i] = entry.label .. " missing" end
+        missingText.text:SetText(table.concat(lines, "\n"))
+        if not missingText:IsShown() then
+            missingText.ResetBounce()
+            missingText:Show()
+        end
+    else
+        missingText:Hide()
+    end
+
+    for _, holder in ipairs(icons) do holder:Hide() end
     if #missing == 0 then
         pulse:Stop()
         row:SetAlpha(1)
@@ -238,12 +298,12 @@ function addon.MI_ClassBuffs_Update()
     end
     local total = #missing * ICON_SIZE + (#missing - 1) * GAP
     row:SetWidth(total)
-    for i, texture in ipairs(missing) do
-        local tex = icon(i)
-        tex:SetTexture(texture)
-        tex:ClearAllPoints()
-        tex:SetPoint("LEFT", (i - 1) * (ICON_SIZE + GAP), 0)
-        tex:Show()
+    for i, entry in ipairs(missing) do
+        local holder = icon(i)
+        holder.tex:SetTexture(entry.icon)
+        holder:ClearAllPoints()
+        holder:SetPoint("LEFT", (i - 1) * (ICON_SIZE + GAP), 0)
+        holder:Show()
     end
     if not row:IsShown() then
         row:Show()
